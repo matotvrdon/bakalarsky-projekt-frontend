@@ -1,53 +1,27 @@
-import type {Conference} from "../types/types.ts";
+import { api } from "./baseApi";
+import type { Conference } from "../types/types";
 
-const API_BASE = 'http://localhost:5010/api';
+export const getAllConferences = (): Promise<Conference[]> => {
+    return api("/api/conference/get-all");
+};
 
-export async function fetchConferences(): Promise<Conference[]> {
-    const response = await fetch(`${API_BASE}/conference/get-all`, { method: 'GET' });
-    const data = await response.json().catch(() => null);
+export const getConferenceById = (id: number): Promise<Conference> => {
+    return api(`/api/conference/get-by-id/${id}`);
+};
 
-    if (!response.ok) {
-        const message = response.statusText || 'Failed to fetch conferences';
-        throw new Error(message);
-    }
-
-    return (data?.payload ?? data) as Conference[];
-}
-
-export async function fetchConferenceDetail(id: number): Promise<Conference> {
-    const response = await fetch(`${API_BASE}/conference/get-by-id/${id}`, { method: 'GET' });
-    const data = await response.json().catch(() => null);
-
-    if (!response.ok) {
-        const message = response.statusText || 'Failed to fetch conference detail';
-        throw new Error(message);
-    }
-
-    return (data?.payload ?? data) as Conference;
-}
-
-export async function createConference(conference: Omit<Conference, 'id'>): Promise<{ id: number }> {
-    const response = await fetch(`${API_BASE}/conference`, {
-        method: 'POST',
-        body: JSON.stringify(conference),
+export const createConference = (data: {
+    name: string;
+    startDate: string; // YYYY-MM-DD
+    endDate: string;
+}): Promise<Conference> => {
+    return api("/api/conference", {
+        method: "POST",
+        json: data
     });
+};
 
-    const data = await response.json().catch(() => null);
-
-    if (!response.ok) {
-        const message = response.statusText || 'Failed to create conference';
-        throw new Error(message);
-    }
-
-    return { id: (data?.payload?.id ?? data?.id) as number };
-}
-
-export async function deleteConference(id: number): Promise<void> {
-    const response = await fetch(`${API_BASE}/conference/${id}`, { method: 'DELETE' });
-
-    if (!response.ok) {
-        await response.json().catch(() => null);
-        const message = response.statusText || 'Failed to delete conference';
-        throw new Error(message);
-    }
-}
+export const deleteConference = (id: number): Promise<void> => {
+    return api(`/api/conference/${id}`, {
+        method: "DELETE"
+    });
+};
