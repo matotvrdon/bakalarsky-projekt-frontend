@@ -1,6 +1,6 @@
 import React from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import AdminLayout from "./pages/admin/AdminLayout.tsx";
+import AdminLayout from "./components/layout/AdminLayout.tsx";
 import DashboardPage from "./pages/admin/pages/DashboardPage.tsx";
 import ConferencesPage from "./pages/admin/pages/ConferencesPage.tsx";
 import ConferenceDetailPage from "./pages/admin/pages/ConferenceDetailPage.tsx";
@@ -12,13 +12,13 @@ import AttendeesPage from "./pages/admin/pages/AttendeesPage.tsx";
 import InvoicesPage from "./pages/admin/pages/InvoicesPage.tsx";
 import InvoiceItemsPage from "./pages/admin/pages/InvoiceItemsPage.tsx";
 import ProgramPage from "./pages/admin/pages/ProgramPage.tsx";
-import OverviewPage from "./pages/overview/OverviewPage.tsx";
-import CommitteesPage from "./pages/committees/CommitteesPage.tsx";
-import SubmissionsPage from "./pages/submissions/SubmissionsPage.tsx";
-import PhotosPage from "./pages/photos/PhotosPage.tsx";
-import EvergreenPage from "./pages/evergreen/EvergreenPage.tsx";
+import OverviewPage from "./pages/OverviewPage.tsx";
+import CommitteesPage from "./pages/CommitteesPage.tsx";
+import SubmissionsPage from "./pages/SubmissionsPage.tsx";
+import PhotosPage from "./pages/PhotosPage.tsx";
+import EvergreenPage from "./pages/EvergreenPage.tsx";
 import PublicLayout from "./components/layout/PublicLayout.tsx";
-import ProgramMenuPage from "./pages/program/ProgramMenuPage.tsx";
+import ProgramMenuPage from "./pages/ProgramMenuPage.tsx";
 
 const App: React.FC = () => {
     return (

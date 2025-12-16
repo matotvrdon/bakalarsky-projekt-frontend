@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import styles from "./AdminSidebar.module.css";
+import styles from "../../styles/AdminSidebar.module.css";
 
 const AdminSidebar = () => {
     const navigate = useNavigate();
@@ -34,6 +34,7 @@ const AdminSidebar = () => {
                     <>
                         <NavLink
                             to={`/admin/conference/${selected}`}
+                            end
                             className={({ isActive }) =>
                                 isActive ? styles.active : styles.link
                             }
@@ -43,6 +44,7 @@ const AdminSidebar = () => {
 
                         <NavLink
                             to={`/admin/conference/${selected}/days`}
+                            end
                             className={({ isActive }) =>
                                 isActive ? styles.active : styles.link
                             }
@@ -52,6 +54,7 @@ const AdminSidebar = () => {
 
                         <NavLink
                             to={`/admin/conference/${selected}/sessions`}
+                            end
                             className={({ isActive }) =>
                                 isActive ? styles.active : styles.link
                             }
@@ -61,6 +64,7 @@ const AdminSidebar = () => {
 
                         <NavLink
                             to={`/admin/conference/${selected}/themes`}
+                            end
                             className={({ isActive }) =>
                                 isActive ? styles.active : styles.link
                             }
@@ -70,6 +74,7 @@ const AdminSidebar = () => {
 
                         <NavLink
                             to={`/admin/conference/${selected}/talks`}
+                            end
                             className={({ isActive }) =>
                                 isActive ? styles.active : styles.link
                             }
@@ -77,12 +82,19 @@ const AdminSidebar = () => {
                             Talks
                         </NavLink>
 
-                        <NavLink to="/admin/program" className={styles.link}>
+                        <NavLink
+                            to="/admin/program"
+                            end
+                            className={({ isActive }) =>
+                                isActive ? styles.active : styles.link
+                            }
+                        >
                             Program
                         </NavLink>
 
                         <NavLink
                             to={`/admin/conference/${selected}/attendees`}
+                            end
                             className={({ isActive }) =>
                                 isActive ? styles.active : styles.link
                             }
@@ -92,6 +104,7 @@ const AdminSidebar = () => {
 
                         <NavLink
                             to={`/admin/conference/${selected}/invoices`}
+                            end
                             className={({ isActive }) =>
                                 isActive ? styles.active : styles.link
                             }
@@ -101,6 +114,7 @@ const AdminSidebar = () => {
 
                         <NavLink
                             to="/admin/invoice-items"
+                            end
                             className={({ isActive }) =>
                                 isActive ? styles.active : styles.link
                             }
