@@ -1,18 +1,12 @@
-import React from "react";
-import { Header } from "../../components/layout/Header.tsx";
-import { Footer } from "../../components/layout/Footer.tsx";
-import {CmsContent} from "../CmsContent.tsx";
-
-interface PageProps {
-    title: string;
-}
-
-export const CommitteesPage: React.FC<PageProps> = () => {
+const CommitteesPage = () => {
     return (
-        <>
-            <Header />
-            <CmsContent slug="committees" />
-            <Footer />
-        </>
+        <section className="page">
+            <h1>Committees</h1>
+            <p>
+                Placeholder content for committees.
+            </p>
+        </section>
     );
 };
+
+export default CommitteesPage;

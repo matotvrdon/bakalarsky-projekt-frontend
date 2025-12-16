@@ -1,13 +1,12 @@
-import {CmsContent} from "../CmsContent.tsx";
-import {Header} from "../../components/layout/Header.tsx";
-import {Footer} from "../../components/layout/Footer.tsx";
-
-export const OverviewPage: React.FC = () => {
+const OverviewPage = () => {
     return (
-        <>
-            <Header />
-            <CmsContent slug="overview" />
-            <Footer />
-        </>
+        <section className="page">
+            <h1>Overview</h1>
+            <p>
+                Placeholder content for overview page.
+            </p>
+        </section>
     );
 };
+
+export default OverviewPage;

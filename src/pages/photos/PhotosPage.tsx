@@ -1,18 +1,12 @@
-import React from "react";
-import { Header } from "../../components/layout/Header.tsx";
-import { Footer } from "../../components/layout/Footer.tsx";
-import {CmsContent} from "../CmsContent.tsx";
-
-interface PageProps {
-    title: string;
-}
-
-export const PhotosPage: React.FC<PageProps> = () => {
+const PhotosPage = () => {
     return (
-        <>
-            <Header />
-            <CmsContent slug="overview" />
-            <Footer />
-        </>
+        <section className="page">
+            <h1>Photos</h1>
+            <p>
+                Placeholder content for photo gallery.
+            </p>
+        </section>
     );
 };
+
+export default PhotosPage;
