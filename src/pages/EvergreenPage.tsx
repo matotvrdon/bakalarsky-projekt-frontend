@@ -3,7 +3,7 @@ const EvergreenPage = () => {
         <section className="page">
             <h1>Evergreen</h1>
             <p>
-                Placeholder evergreen content.
+                Obsah stránky
             </p>
         </section>
     );

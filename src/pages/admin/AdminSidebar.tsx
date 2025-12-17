@@ -6,11 +6,6 @@ const AdminSidebar = () => {
 
     const selected = localStorage.getItem("admin.selectedConferenceId");
 
-    const goToConferences = () => {
-        localStorage.removeItem("admin.selectedConferenceId");
-        navigate("/admin/conferences");
-    };
-
     return (
         <aside className={styles.sidebar}>
             <div className={styles.logo}>ADMIN</div>
@@ -26,9 +21,17 @@ const AdminSidebar = () => {
                     Dashboard
                 </NavLink>
 
-                <div onClick={goToConferences} className={styles.link}>
+                <NavLink
+                    to="/admin/conferences"
+                    className={({ isActive }) =>
+                        isActive ? styles.active : styles.link
+                    }
+                    onClick={() => {
+                        localStorage.removeItem("admin.selectedConferenceId");
+                    }}
+                >
                     Conferences
-                </div>
+                </NavLink>
 
                 {selected && (
                     <>

@@ -3,7 +3,7 @@ const ProgramMenuPage = () => {
         <section className="page">
             <h1>Program</h1>
             <p>
-                Placeholder content for conference program.
+                Obsah stránky
             </p>
         </section>
     );

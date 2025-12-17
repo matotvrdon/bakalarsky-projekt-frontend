@@ -3,7 +3,7 @@ const OverviewPage = () => {
         <section className="page">
             <h1>Overview</h1>
             <p>
-                Placeholder content for overview page.
+                Obsah stránky
             </p>
         </section>
     );

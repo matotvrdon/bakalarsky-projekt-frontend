@@ -3,7 +3,7 @@ const SubmissionsPage = () => {
         <section className="page">
             <h1>Submissions</h1>
             <p>
-                Placeholder content for submissions.
+                Obsah stránky
             </p>
         </section>
     );

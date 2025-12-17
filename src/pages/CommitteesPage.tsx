@@ -3,7 +3,7 @@ const CommitteesPage = () => {
         <section className="page">
             <h1>Committees</h1>
             <p>
-                Placeholder content for committees.
+                Obsah stránky
             </p>
         </section>
     );

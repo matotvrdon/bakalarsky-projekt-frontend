@@ -41,12 +41,12 @@ export const Header: React.FC = () => {
                             {item.label}
                         </NavLink>
                     ))}
+                    <button className={styles.registerButton}>
+                        Register
+                    </button>
                 </nav>
 
                 {/* Register button */}
-                <button className={styles.registerButton}>
-                    Register
-                </button>
             </div>
         </header>
     );
