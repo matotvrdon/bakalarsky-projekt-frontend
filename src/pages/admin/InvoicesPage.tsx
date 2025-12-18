@@ -1,6 +1,6 @@
 import { useState } from "react";
-import type { Invoice } from "../../../types/types";
-import {createInvoice, getInvoice} from "../../../api/invoiceApi";
+import type { Invoice } from "../../types/types.ts";
+import {createInvoice, getInvoice} from "../../api/invoiceApi.ts";
 
 const InvoicePage = () => {
     const [customerId, setCustomerId] = useState("");

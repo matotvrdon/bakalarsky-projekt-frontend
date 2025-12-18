@@ -1,6 +1,6 @@
 import { useState } from "react";
 import styles from "./InvoiceItemsPage.module.css";
-import { getInvoiceItem, createInvoiceItem } from "../../../api/invoiceItemApi.ts";
+import { getInvoiceItem, createInvoiceItem } from "../../api/invoiceItemApi.ts";
 
 const InvoiceItemPage = () => {
     // ----- GET EXISTUJÚCEHO ITEMU -----

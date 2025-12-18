@@ -4,9 +4,9 @@ import styles from "./AttendeesPage.module.css";
 import {
     getAttendeesByConference,
     createAttendee,
-} from "../../../api/attendeeApi.ts";
+} from "../../api/attendeeApi.ts";
 
-import type { Attendee } from "../../../types/types.ts";
+import type { Attendee } from "../../types/types.ts";
 
 const AttendeesPage = () => {
     const [attendees, setAttendees] = useState<Attendee[]>([]);

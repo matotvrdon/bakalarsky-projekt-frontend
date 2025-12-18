@@ -1,24 +1,24 @@
 import React from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import AdminLayout from "./components/layout/AdminLayout.tsx";
-import DashboardPage from "./pages/admin/pages/DashboardPage.tsx";
-import ConferencesPage from "./pages/admin/pages/ConferencesPage.tsx";
-import ConferenceDetailPage from "./pages/admin/pages/ConferenceDetailPage.tsx";
-import DaysPage from "./pages/admin/pages/DaysPage.tsx";
-import SessionsPage from "./pages/admin/pages/SessionsPage.tsx";
-import ThemesPage from "./pages/admin/pages/ThemesPage.tsx";
-import TalksPage from "./pages/admin/pages/TalksPage.tsx";
-import AttendeesPage from "./pages/admin/pages/AttendeesPage.tsx";
-import InvoicesPage from "./pages/admin/pages/InvoicesPage.tsx";
-import InvoiceItemsPage from "./pages/admin/pages/InvoiceItemsPage.tsx";
-import ProgramPage from "./pages/admin/pages/ProgramPage.tsx";
-import OverviewPage from "./pages/OverviewPage.tsx";
-import CommitteesPage from "./pages/CommitteesPage.tsx";
-import SubmissionsPage from "./pages/SubmissionsPage.tsx";
-import PhotosPage from "./pages/PhotosPage.tsx";
-import EvergreenPage from "./pages/EvergreenPage.tsx";
+import DashboardPage from "./pages/admin/DashboardPage.tsx";
+import ConferencesPage from "./pages/admin/ConferencesPage.tsx";
+import ConferenceDetailPage from "./pages/admin/ConferenceDetailPage.tsx";
+import DaysPage from "./pages/admin/DaysPage.tsx";
+import SessionsPage from "./pages/admin/SessionsPage.tsx";
+import ThemesPage from "./pages/admin/ThemesPage.tsx";
+import TalksPage from "./pages/admin/TalksPage.tsx";
+import AttendeesPage from "./pages/admin/AttendeesPage.tsx";
+import InvoicesPage from "./pages/admin/InvoicesPage.tsx";
+import InvoiceItemsPage from "./pages/admin/InvoiceItemsPage.tsx";
+import ProgramPage from "./pages/admin/ProgramPage.tsx";
+import OverviewPage from "./pages/public/OverviewPage.tsx";
+import CommitteesPage from "./pages/public/CommitteesPage.tsx";
+import SubmissionsPage from "./pages/public/SubmissionsPage.tsx";
+import PhotosPage from "./pages/public/PhotosPage.tsx";
+import EvergreenPage from "./pages/public/EvergreenPage.tsx";
 import PublicLayout from "./components/layout/PublicLayout.tsx";
-import ProgramMenuPage from "./pages/ProgramMenuPage.tsx";
+import ProgramMenuPage from "./pages/public/ProgramMenuPage.tsx";
 
 const App: React.FC = () => {
     return (
