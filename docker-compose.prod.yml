@@ -3,4 +3,4 @@ services:
     image: ghcr.io/${IMAGE_REPO}:${IMAGE_TAG}
     restart: unless-stopped
     ports:
-      - ":5003:80"
+      - "5003:80"
