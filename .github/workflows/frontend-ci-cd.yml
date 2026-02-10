@@ -27,15 +27,24 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_PAT || secrets.GITHUB_TOKEN }}
+      - name: Set API base URL
+        run: |
+          if [ "${{ github.ref_name }}" == "main" ]; then
+            echo "VITE_API_BASE_URL=${{ secrets.VITE_API_BASE_URL_PROD }}" >> $GITHUB_ENV
+          elif [ "${{ github.ref_name }}" == "test" ]; then
+            echo "VITE_API_BASE_URL=${{ secrets.VITE_API_BASE_URL_TEST }}" >> $GITHUB_ENV
+          else
+            echo "VITE_API_BASE_URL=${{ secrets.VITE_API_BASE_URL_DEV }}" >> $GITHUB_ENV
+          fi
       - name: Debug API URL
-        run: echo "API URL is set to ${{ secrets.VITE_API_BASE_URL }}"
+        run: echo "API URL is set to ${{ env.VITE_API_BASE_URL }}"
       - name: Build and push image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
           build-args: |
-            VITE_API_BASE_URL=${{ secrets.VITE_API_BASE_URL }}
+            VITE_API_BASE_URL=${{ env.VITE_API_BASE_URL }}
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_REPO }}:${{ env.IMAGE_TAG }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_REPO }}:latest
