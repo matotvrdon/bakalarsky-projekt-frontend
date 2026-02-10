@@ -1,4 +1,5 @@
 import { api } from "./baseApi";
+import { toUtcIsoDate } from "../utils/date";
 
 export const getInvoice = (invoiceId: number) =>
     api(`/api/invoice/${invoiceId}`);
@@ -11,5 +12,9 @@ export const createInvoice = (data: {
 }) =>
     api("/api/invoice/", {
         method: "POST",
-        json: data
+        json: {
+            ...data,
+            issueDate: toUtcIsoDate(data.issueDate),
+            dueDate: toUtcIsoDate(data.dueDate)
+        }
     });
