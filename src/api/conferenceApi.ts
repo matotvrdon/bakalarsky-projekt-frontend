@@ -1,4 +1,5 @@
 import { api } from "./baseApi";
+import { toUtcIsoDate } from "../utils/date";
 import type { Conference } from "../types/types";
 
 export const getAllConferences = (): Promise<Conference[]> => {
@@ -16,7 +17,11 @@ export const createConference = (data: {
 }): Promise<Conference> => {
     return api("/api/conference", {
         method: "POST",
-        json: data
+        json: {
+            ...data,
+            startDate: toUtcIsoDate(data.startDate),
+            endDate: toUtcIsoDate(data.endDate)
+        }
     });
 };
 
