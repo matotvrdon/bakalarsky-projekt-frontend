@@ -12,6 +12,7 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
+    environment: ${{ github.ref_name == 'main' && 'prod' || github.ref_name == 'test' && 'test' || 'dev' }}
     permissions:
       contents: read
       packages: write
@@ -26,22 +27,15 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_PAT || secrets.GITHUB_TOKEN }}
-      - name: Set API base URL (dev)
-        if: github.ref == 'refs/heads/dev'
-        run: echo "VITE_API_BASE_URL=${{ secrets.VITE_API_BASE_URL_DEV }}" >> $GITHUB_ENV
-      - name: Set API base URL (test)
-        if: github.ref == 'refs/heads/test'
-        run: echo "VITE_API_BASE_URL=${{ secrets.VITE_API_BASE_URL_TEST }}" >> $GITHUB_ENV
-      - name: Set API base URL (prod)
-        if: github.ref == 'refs/heads/main'
-        run: echo "VITE_API_BASE_URL=${{ secrets.VITE_API_BASE_URL_PROD }}" >> $GITHUB_ENV
+      - name: Debug API URL
+        run: echo "API URL is set to ${{ secrets.VITE_API_BASE_URL }}"
       - name: Build and push image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
           build-args: |
-            VITE_API_BASE_URL=${{ env.VITE_API_BASE_URL }}
+            VITE_API_BASE_URL=${{ secrets.VITE_API_BASE_URL }}
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_REPO }}:${{ env.IMAGE_TAG }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_REPO }}:latest
