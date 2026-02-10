@@ -2,7 +2,6 @@ name: Frontend CI/CD
 
 on:
   push:
-    branches: ["main"]
   workflow_dispatch:
 
 env:
@@ -27,17 +26,29 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_PAT || secrets.GITHUB_TOKEN }}
+      - name: Set API base URL (dev)
+        if: github.ref == 'refs/heads/dev'
+        run: echo "VITE_API_BASE_URL=${{ secrets.VITE_API_BASE_URL_DEV }}" >> $GITHUB_ENV
+      - name: Set API base URL (test)
+        if: github.ref == 'refs/heads/test'
+        run: echo "VITE_API_BASE_URL=${{ secrets.VITE_API_BASE_URL_TEST }}" >> $GITHUB_ENV
+      - name: Set API base URL (prod)
+        if: github.ref == 'refs/heads/main'
+        run: echo "VITE_API_BASE_URL=${{ secrets.VITE_API_BASE_URL_PROD }}" >> $GITHUB_ENV
       - name: Build and push image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
+          build-args: |
+            VITE_API_BASE_URL=${{ env.VITE_API_BASE_URL }}
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_REPO }}:${{ env.IMAGE_TAG }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_REPO }}:latest
 
   deploy:
-    runs-on: self-hosted
+    if: github.ref_name == 'main' || github.ref_name == 'dev' || github.ref_name == 'test'
+    runs-on: ["self-hosted", "frontend"]
     needs: build
     permissions:
       contents: read
@@ -45,6 +56,22 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Select compose file
+        run: |
+          case "${GITHUB_REF_NAME}" in
+            main)
+              echo "COMPOSE_FILE=docker-compose.prod.yml" >> "$GITHUB_ENV"
+              echo "COMPOSE_PROJECT_NAME=frontend-prod" >> "$GITHUB_ENV"
+              ;;
+            dev)
+              echo "COMPOSE_FILE=docker-compose.dev.yml" >> "$GITHUB_ENV"
+              echo "COMPOSE_PROJECT_NAME=frontend-dev" >> "$GITHUB_ENV"
+              ;;
+            test)
+              echo "COMPOSE_FILE=docker-compose.test.yml" >> "$GITHUB_ENV"
+              echo "COMPOSE_PROJECT_NAME=frontend-test" >> "$GITHUB_ENV"
+              ;;
+          esac
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
@@ -55,4 +82,4 @@ jobs:
         env:
           IMAGE_REPO: ${{ env.IMAGE_REPO }}
           IMAGE_TAG: ${{ env.IMAGE_TAG }}
-        run: docker compose -f docker-compose.prod.yml up -d
+        run: docker compose -f "$COMPOSE_FILE" -p "$COMPOSE_PROJECT_NAME" up -d
