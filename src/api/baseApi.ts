@@ -1,4 +1,4 @@
-export const BASE_URL = "http://localhost:5010";
+export const BASE_URL = "http://147.232.205.193:5001";
 
 export interface ApiOptions extends RequestInit {
     json?: any;          // shortcut pre body
