@@ -1,0 +1,6 @@
+services:
+  frontend:
+    image: ghcr.io/${IMAGE_REPO}:${IMAGE_TAG}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5003:80"
