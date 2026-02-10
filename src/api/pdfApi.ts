@@ -1,8 +1,8 @@
-import { BASE_URL } from "./baseApi";
+import { buildApiUrl } from "./baseApi";
 
 export const downloadProgram = async (conferenceId: number) => {
     const response = await fetch(
-        `${BASE_URL}/api/pdf/create-program/${conferenceId}`,
+        buildApiUrl(`/api/pdf/create-program/${conferenceId}`),
         {
             method: "POST"
         }
