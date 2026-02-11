@@ -1,6 +1,5 @@
 declare const __API_BASE_URL__: string;
-const API_PREFIX = "/api";
-export const BASE_URL = __API_BASE_URL__.replace(/\/$/, "");
+export const BASE_URL = __API_BASE_URL__;
 
 export interface ApiOptions extends RequestInit {
     json?: any;          // shortcut pre body
@@ -8,7 +7,7 @@ export interface ApiOptions extends RequestInit {
 }
 
 export async function api(path: string, options: ApiOptions = {}) {
-    const url = buildApiUrl(path);
+    const url = `${BASE_URL}${path}`;
 
     const headers: HeadersInit = {
         "Accept": "application/json",
@@ -42,13 +41,4 @@ export async function api(path: string, options: ApiOptions = {}) {
     if (response.status === 204) return null;
 
     return response.json();
-}
-
-export function buildApiUrl(path: string) {
-    const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-    if (!BASE_URL) return normalizedPath;
-    if (BASE_URL.endsWith(API_PREFIX) && normalizedPath.startsWith(API_PREFIX)) {
-        return `${BASE_URL}${normalizedPath.slice(API_PREFIX.length)}`;
-    }
-    return `${BASE_URL}${normalizedPath}`;
 }
