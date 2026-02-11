@@ -58,6 +58,22 @@ const AdminSidebar = ({ isOpen, onClose }: Props) => {
                 </NavLink>
 
                 <NavLink
+                    to="/admin/nav-bar"
+                    onClick={handleLinkClick}
+                    className={({ isActive }) => `admin-link ${isActive ? 'admin-link--active' : ''}`}
+                >
+                    Nav Bar
+                </NavLink>
+
+                <NavLink
+                    to="/admin/content-pages"
+                    onClick={handleLinkClick}
+                    className={({ isActive }) => `admin-link ${isActive ? 'admin-link--active' : ''}`}
+                >
+                    Content Pages
+                </NavLink>
+
+                <NavLink
                     to="/admin/conferences"
                     onClick={handleConferencesClick}
                     className={({ isActive }) => `admin-link ${isActive ? 'admin-link--active' : ''}`}
