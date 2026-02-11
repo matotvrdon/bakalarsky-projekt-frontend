@@ -6,6 +6,7 @@ export { default as AdminCard } from "./AdminCard";
 export { default as AdminEmpty } from "./AdminEmpty";
 export { default as AdminButton } from "./AdminButton";
 export { default as TextField } from "./TextField";
+export { default as TextAreaField } from "./TextAreaField";
 export { default as SelectField } from "./SelectField";
 export { default as Section } from "./Section";
 export { default as SubSection } from "./SubSection";

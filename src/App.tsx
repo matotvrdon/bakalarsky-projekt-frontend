@@ -12,30 +12,24 @@ import AttendeesPage from "./pages/admin/AttendeesPage.tsx";
 import InvoicesPage from "./pages/admin/InvoicesPage.tsx";
 import InvoiceItemsPage from "./pages/admin/InvoiceItemsPage.tsx";
 import ProgramPage from "./pages/admin/ProgramPage.tsx";
-import OverviewPage from "./pages/public/OverviewPage.tsx";
-import CommitteesPage from "./pages/public/CommitteesPage.tsx";
-import SubmissionsPage from "./pages/public/SubmissionsPage.tsx";
-import PhotosPage from "./pages/public/PhotosPage.tsx";
-import EvergreenPage from "./pages/public/EvergreenPage.tsx";
+import NavBarMenuPage from "./pages/admin/NavBarMenuPage.tsx";
+import AdminPageContentPage from "./pages/admin/PageContentPage.tsx";
 import PublicLayout from "./components/layout/PublicLayout.tsx";
-import ProgramMenuPage from "./pages/public/ProgramMenuPage.tsx";
-
+import PublicPageContentPage from "./pages/public/PageContentPage.tsx";
 const App: React.FC = () => {
     return (
         <BrowserRouter>
             <Routes>
                 {/* PUBLIC PAGES */}
                 <Route element={<PublicLayout />}>
-                    <Route path="/" element={<OverviewPage />} />
-                    <Route path="/program" element={<ProgramMenuPage />} />
-                    <Route path="/committees" element={<CommitteesPage />} />
-                    <Route path="/submissions" element={<SubmissionsPage />} />
-                    <Route path="/photos" element={<PhotosPage />} />
-                    <Route path="/evergreen" element={<EvergreenPage />} />
+                    <Route index element={<PublicPageContentPage />} />
+                    <Route path=":slug" element={<PublicPageContentPage />} />
                 </Route>
 
                 <Route path="/admin" element={<AdminLayout />}>
                     <Route index element={<DashboardPage />} />
+                    <Route path="nav-bar" element={<NavBarMenuPage />} />
+                    <Route path="content-pages" element={<AdminPageContentPage />} />
                     <Route path="conferences" element={<ConferencesPage />} />
 
                     {/* Conference detail */}

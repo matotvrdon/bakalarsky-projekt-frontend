@@ -187,6 +187,10 @@
     min-width: 0;
 }
 
+.admin-field--full {
+    grid-column: 1 / -1;
+}
+
 .admin-label {
     font-size: 12px;
     font-weight: 600;
