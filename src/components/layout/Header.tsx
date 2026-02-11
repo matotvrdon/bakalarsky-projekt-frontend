@@ -1,18 +1,44 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
 import styles from "../../styles/header.module.css";
+import { getAllNavBarMenus } from "../../api/navBarMenuApi";
+import type { NavBarMenu } from "../../types/types";
+import { buildNavPath, isMenuActive } from "../../utils/navBar";
 
-const NAV_ITEMS = [
-    { label: "ADMIN", path: "/admin" },
-    { label: "OVERVIEW", path: "/" },
-    { label: "PROGRAM", path: "/program" },
-    { label: "SUBMISSIONS", path: "/submissions" },
-    { label: "COMMITTEES", path: "/committees" },
-    { label: "PHOTOS", path: "/photos" },
-    { label: "EVERGREEN", path: "/evergreen" },
+const STATIC_NAV_ITEMS = [
+    { key: "admin", label: "ADMIN", path: "/admin" },
 ];
 
 export const Header: React.FC = () => {
+    const [menuItems, setMenuItems] = useState<NavBarMenu[]>([]);
+
+    useEffect(() => {
+        let isMounted = true;
+        getAllNavBarMenus()
+            .then((data) => {
+                if (!isMounted) return;
+                setMenuItems(Array.isArray(data) ? data : []);
+            })
+            .catch((error) => {
+                console.error("Failed to load nav bar menu.", error);
+            });
+
+        return () => {
+            isMounted = false;
+        };
+    }, []);
+
+    const dynamicItems = menuItems
+        .filter((item) => isMenuActive(item.isActive))
+        .filter((item) => item.name.trim().toLowerCase() !== "admin")
+        .map((item) => ({
+            key: `nav-${item.id}`,
+            label: item.name,
+            path: buildNavPath(item.name),
+        }));
+
+    const navItems = [...STATIC_NAV_ITEMS, ...dynamicItems];
+
     return (
         <header className={styles.header}>
             <div className={styles.inner}>
@@ -27,9 +53,9 @@ export const Header: React.FC = () => {
 
                 {/* Navigácia */}
                 <nav className={styles.nav}>
-                    {NAV_ITEMS.map((item) => (
+                    {navItems.map((item) => (
                         <NavLink
-                            key={item.path}
+                            key={item.key}
                             to={item.path}
                             end={item.path === "/"}
                             className={({ isActive }) =>
