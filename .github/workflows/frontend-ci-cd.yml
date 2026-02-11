@@ -6,8 +6,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  # FTP Deploy pre main branch (Plesk)
-  deploy-ftp:
+  # Build pre main branch
+  build-main:
     if: github.ref_name == 'main'
     runs-on: ubuntu-latest
     environment: prod
@@ -26,15 +26,40 @@ jobs:
         env:
           VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL_PROD }}
 
-      - name: Deploy via FTP
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
         with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          local-dir: dist/
-          server-dir: ${{ secrets.FTP_SERVER_DIR }}
-          dangerous-clean-slate: true
+          name: dist
+          path: dist/
+
+  # FTP Deploy pre main branch cez self-hosted runner
+  deploy-ftp:
+    if: github.ref_name == 'main'
+    runs-on: ["self-hosted", "frontend"]
+    needs: build-main
+    environment: prod
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Install lftp
+        run: |
+          if ! command -v lftp &> /dev/null; then
+            sudo apt-get update && sudo apt-get install -y lftp
+          fi
+
+      - name: Deploy via FTP using lftp
+        run: |
+          lftp -c "
+            set ftp:ssl-allow no;
+            set ssl:verify-certificate no;
+            open -u ${{ secrets.FTP_USERNAME }},${{ secrets.FTP_PASSWORD }} ${{ secrets.FTP_SERVER }};
+            mirror -R --delete --verbose dist/ ${{ secrets.FTP_SERVER_DIR }};
+            quit
+          "
 
   # Docker deploy pre dev a test branches
   build-docker:

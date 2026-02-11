@@ -9,6 +9,28 @@ export interface Attendee {
     invoiceItem: (InvoiceItem | null)[];
 }
 
+export type IsActiveStatus = "Active" | "Inactive" | 0 | 1 | boolean;
+
+export interface NavBarMenu {
+    id: number;
+    name: string;
+    isActive: IsActiveStatus;
+}
+
+export interface PageContent {
+    id: number;
+    title?: string;
+    markdown?: string;
+    html?: string;
+    Title?: string;
+    Markdown?: string;
+    Html?: string;
+    navBarMenuId?: number;
+    NavBarMenuId?: number;
+    navBarMenu?: NavBarMenu | null;
+    NavBarMenu?: NavBarMenu | null;
+}
+
 export interface Conference {
     id: number;
     name: string;
