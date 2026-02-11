@@ -4,10 +4,3 @@ services:
     restart: unless-stopped
     ports:
       - "5006:80"
-    networks:
-      - web-proxy
-
-networks:
-  web-proxy:
-    external: true
-    name: web-proxy
