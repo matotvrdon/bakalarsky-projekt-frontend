@@ -73,6 +73,7 @@ jobs:
       REGISTRY: ghcr.io
       IMAGE_REPO: ${{ secrets.IMAGE_REPO }}
       IMAGE_TAG: ${{ github.sha }}
+      ENV_LATEST_TAG: ${{ github.ref_name }}-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -104,7 +105,7 @@ jobs:
             VITE_API_BASE_URL=${{ env.VITE_API_BASE_URL }}
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_REPO }}:${{ env.IMAGE_TAG }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_REPO }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_REPO }}:${{ env.ENV_LATEST_TAG }}
 
   deploy-docker:
     if: github.ref_name == 'dev' || github.ref_name == 'test'
@@ -116,7 +117,7 @@ jobs:
     env:
       REGISTRY: ghcr.io
       IMAGE_REPO: ${{ secrets.IMAGE_REPO }}
-      IMAGE_TAG: ${{ github.sha }}
+      IMAGE_TAG: ${{ github.ref_name }}-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
