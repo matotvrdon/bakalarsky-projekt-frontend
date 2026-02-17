@@ -143,4 +143,4 @@ jobs:
           password: ${{ secrets.GHCR_PAT || secrets.GITHUB_TOKEN }}
 
       - name: Deploy
-        run: docker compose -f "$COMPOSE_FILE" -p "$COMPOSE_PROJECT_NAME" up -d
+        run: docker compose -f "$COMPOSE_FILE" -p "$COMPOSE_PROJECT_NAME" up -d --pull always --force-recreate --remove-orphans
