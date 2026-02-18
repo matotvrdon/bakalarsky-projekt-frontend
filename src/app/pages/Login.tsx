@@ -6,6 +6,7 @@ import { Label } from "../components/ui/label.tsx";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card.tsx";
 import { Alert, AlertDescription } from "../components/ui/alert.tsx";
 import { LogIn, AlertCircle } from "lucide-react";
+import { login as loginRequest } from "../api/authApi.ts";
 
 export function Login() {
   const navigate = useNavigate();
@@ -20,28 +21,23 @@ export function Login() {
     setLoading(true);
 
     try {
-      // Simulate API call - replace with actual backend call
-      // For demo: admin@conference.sk / admin123 is admin
-      // Any other email with password from email gets participant role
-      
-      if (email === "admin@conference.sk" && password === "admin123") {
-        const user = {
-          email,
-          role: "admin",
-          name: "Administrator",
-        };
-        localStorage.setItem("currentUser", JSON.stringify(user));
-        navigate("/admin");
-      } else {
-        // Simulate participant login - in real app, check backend
-        const user = {
-          email,
-          role: "participant",
-          name: email.split("@")[0],
-        };
-        localStorage.setItem("currentUser", JSON.stringify(user));
-        navigate("/dashboard");
-      }
+      const response = await loginRequest({ email, password });
+      const apiUser = response.user;
+      const roleValue = apiUser.role;
+      const roleNormalized =
+        typeof roleValue === "number"
+          ? (roleValue === 0 ? "admin" : "participant")
+          : (roleValue || "participant").toString().toLowerCase();
+
+      const user = {
+        id: apiUser.id,
+        email: apiUser.email,
+        role: roleNormalized,
+        name: apiUser.email.split("@")[0],
+      };
+
+      localStorage.setItem("currentUser", JSON.stringify(user));
+      navigate(roleNormalized === "admin" ? "/admin" : "/dashboard");
     } catch (err) {
       setError("Nesprávny email alebo heslo");
     } finally {

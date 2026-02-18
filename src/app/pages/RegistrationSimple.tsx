@@ -6,6 +6,8 @@ import { Input } from "../components/ui/input.tsx";
 import { Label } from "../components/ui/label.tsx";
 import { Alert, AlertDescription } from "../components/ui/alert.tsx";
 import { CheckCircle2, AlertCircle, Mail, User } from "lucide-react";
+import { getActiveConferences } from "../api/conferenceApi.ts";
+import { registerSimple } from "../api/authApi.ts";
 
 export function Registration() {
   const navigate = useNavigate();
@@ -19,32 +21,64 @@ export function Registration() {
   });
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [generatedCredentials, setGeneratedCredentials] = useState<{
+  const [error, setError] = useState("");
+  const [registrationResult, setRegistrationResult] = useState<{
     email: string;
-    password: string;
+    message: string;
+    messageStatus: 0 | 1;
   } | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError("");
 
     try {
-      // Generate random password
-      const password = Math.random().toString(36).slice(-8);
+      const conferences = await getActiveConferences();
+      const activeConference = conferences[0];
+      if (!activeConference) {
+        throw new Error("Aktívna konferencia nebola nájdená.");
+      }
 
-      // Simulate API call to backend
-      // In real app: POST to /api/registration with formData
-      
-      // Simulate email being sent
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
-      setGeneratedCredentials({
+      const response = await registerSimple({
+        firstName: formData.firstName,
+        lastName: formData.lastName,
         email: formData.email,
-        password: password,
+        phone: formData.phone || undefined,
+        affiliation: formData.affiliation || undefined,
+        country: formData.country || undefined,
+        conferenceId: activeConference.id
+      });
+
+      const messageStatus =
+        "messageStatus" in response
+          ? response.messageStatus
+          : ("messageStutus" in response ? (response as any).messageStutus : 1);
+
+      if (messageStatus === 0) {
+        setRegistrationResult(null);
+        setError(response.message);
+        setSuccess(false);
+        return;
+      }
+
+      setRegistrationResult({
+        email: response.email,
+        message: response.message,
+        messageStatus: 1,
       });
       setSuccess(true);
     } catch (error) {
       console.error("Registration error:", error);
+      const rawMessage = error instanceof Error ? error.message : "Registrácia zlyhala";
+      let resolvedMessage = rawMessage;
+      try {
+        const parsed = JSON.parse(rawMessage);
+        if (parsed && typeof parsed.message === "string") {
+          resolvedMessage = parsed.message;
+        }
+      } catch { }
+      setError(resolvedMessage);
     } finally {
       setLoading(false);
     }
@@ -54,7 +88,7 @@ export function Registration() {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  if (success && generatedCredentials) {
+  if (success && registrationResult) {
     return (
       <div className="min-h-[calc(100vh-4rem)] bg-gray-50 py-12 px-4">
         <div className="container mx-auto max-w-2xl">
@@ -66,40 +100,18 @@ export function Registration() {
                 </div>
               </div>
               <CardTitle className="text-2xl">Registrácia úspešná!</CardTitle>
-              <CardDescription>
-                Vaše prihlasovacie údaje boli odoslané na email
-              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <Alert className="bg-blue-50 border-blue-200">
-                <Mail className="h-4 w-4 text-blue-600" />
-                <AlertDescription className="text-blue-900">
-                  Na adresu <strong>{generatedCredentials.email}</strong> bol odoslaný email s prihlasovacími údajmi.
-                </AlertDescription>
-              </Alert>
-
-              {/*<div className="p-4 bg-gray-50 rounded-lg border">*/}
-              {/*  <h3 className="font-semibold mb-3 flex items-center gap-2">*/}
-              {/*    <User className="w-5 h-5" />*/}
-              {/*    Vaše prihlasovacie údaje*/}
-              {/*  </h3>*/}
-              {/*  <div className="space-y-2 text-sm">*/}
-              {/*    <div className="flex justify-between">*/}
-              {/*      <span className="text-gray-600">Email:</span>*/}
-              {/*      <span className="font-mono font-semibold">{generatedCredentials.email}</span>*/}
-              {/*    </div>*/}
-              {/*    <div className="flex justify-between">*/}
-              {/*      <span className="text-gray-600">Heslo:</span>*/}
-              {/*      <span className="font-mono font-semibold">{generatedCredentials.password}</span>*/}
-              {/*    </div>*/}
-              {/*  </div>*/}
-              {/*  <p className="text-xs text-gray-500 mt-3">*/}
-              {/*    Poznámka: Uložte si tieto údaje. Budete ich potrebovať na prihlásenie.*/}
-              {/*  </p>*/}
-              {/*</div>*/}
-
-              <div className="space-y-3">
-                <h4 className="font-semibold">Ďalšie kroky:</h4>
+        <CardContent className="space-y-6">
+          {registrationResult?.message && (
+            <Alert className="bg-blue-50 border-blue-200">
+              <Mail className="h-4 w-4 text-blue-600" />
+              <AlertDescription className="text-blue-900">
+                {registrationResult.message} {registrationResult.email}
+              </AlertDescription>
+            </Alert>
+          )}
+          <div className="space-y-3">
+            <h4 className="font-semibold">Ďalšie kroky:</h4>
                 <ol className="list-decimal list-inside space-y-2 text-sm text-gray-600">
                   <li>Prihláste sa pomocou emailu a hesla</li>
                   <li>Vyplňte údaje o vašej účasti (typ účasti, ubytovanie, strava)</li>
@@ -134,6 +146,12 @@ export function Registration() {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {error && (
+              <Alert variant="destructive" className="mb-6">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Personal Information */}
               <div className="space-y-4">

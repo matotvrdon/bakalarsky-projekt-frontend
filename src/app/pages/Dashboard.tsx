@@ -15,12 +15,17 @@ import {
   User, FileText, Hotel, UtensilsCrossed, Receipt, 
   CheckCircle2, Clock, AlertCircle, Download, Copy, Users
 } from "lucide-react";
+import { getParticipantByUserId, updateParticipant, type ParticipantPayload } from "../api/participantApi.ts";
 
 export function Dashboard() {
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [participationType, setParticipationType] = useState<string>("");
-  const [hasSubmission, setHasSubmission] = useState(false);
+  const [isStudent, setIsStudent] = useState(false);
+  const [studentProofFile, setStudentProofFile] = useState<File | null>(null);
+  const [participantDraft, setParticipantDraft] = useState<ParticipantPayload | null>(null);
+  const [savingParticipant, setSavingParticipant] = useState(false);
+  const [saveParticipantError, setSaveParticipantError] = useState("");
   const [willPresent, setWillPresent] = useState(false);
   const [submission, setSubmission] = useState({
     title: "",
@@ -58,6 +63,107 @@ export function Dashboard() {
     setCurrentUser(userData);
   }, [navigate]);
 
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const loadParticipant = async () => {
+      try {
+        const participant = await getParticipantByUserId(currentUser.id);
+        setParticipantDraft(participant);
+        localStorage.setItem("participantDraft", JSON.stringify(participant));
+        setParticipationType(
+          participant.registrationType === 1
+            ? "participantWithSubmission"
+            : participant.registrationType === 2
+              ? "participantWithoutSubmission"
+              : ""
+        );
+        setIsStudent(participant.studentStatus !== 0);
+      } catch {
+        const stored = localStorage.getItem("participantDraft");
+        if (stored) {
+          const parsed = JSON.parse(stored) as ParticipantPayload;
+          setParticipantDraft(parsed);
+          setParticipationType(
+            parsed.registrationType === 1
+              ? "participantWithSubmission"
+              : parsed.registrationType === 2
+                ? "participantWithoutSubmission"
+                : ""
+          );
+          setIsStudent(parsed.studentStatus !== 0);
+        } else {
+          const nameParts = (currentUser.name || "").trim().split(" ");
+          const firstName = nameParts[0] || "";
+          const lastName = nameParts.slice(1).join(" ") || "";
+          const draft: ParticipantPayload = {
+            id: currentUser.participantId ?? 0,
+            firstName,
+            lastName,
+            phone: null,
+            affiliation: null,
+            country: null,
+            registrationType: 0,
+            studentStatus: 0,
+            userId: currentUser.id ?? 0,
+            conferenceId: currentUser.conferenceId ?? 0
+          };
+          setParticipantDraft(draft);
+          localStorage.setItem("participantDraft", JSON.stringify(draft));
+        }
+      }
+    };
+
+    loadParticipant();
+  }, [currentUser]);
+
+  const updateDraft = (updates: Partial<ParticipantPayload>) => {
+    setParticipantDraft((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev, ...updates };
+      localStorage.setItem("participantDraft", JSON.stringify(next));
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    if (!participantDraft) return;
+    const registrationType =
+      participationType === "participantWithSubmission"
+        ? 1
+        : participationType === "participantWithoutSubmission"
+          ? 2
+          : 0;
+
+    let studentStatus: ParticipantPayload["studentStatus"] = 0;
+    if (isStudent) {
+      studentStatus = studentProofFile ? 2 : 1;
+    }
+
+    updateDraft({ registrationType, studentStatus });
+  }, [participationType, isStudent, studentProofFile]);
+
+  useEffect(() => {
+    if (!participantDraft) return;
+    if (participantDraft.registrationType === 0 && participantDraft.studentStatus === 0) {
+      return;
+    }
+
+    const timeout = window.setTimeout(async () => {
+      setSavingParticipant(true);
+      setSaveParticipantError("");
+      try {
+        await updateParticipant(participantDraft);
+      } catch (error) {
+        setSaveParticipantError(error instanceof Error ? error.message : "Uloženie zlyhalo");
+      } finally {
+        setSavingParticipant(false);
+      }
+    }, 600);
+
+    return () => window.clearTimeout(timeout);
+  }, [participantDraft]);
+
   const accommodationOptions = [
     { id: 1, name: "Hotel Devín - Jednolôžková", price: 85 },
     { id: 2, name: "Hotel Devín - Dvojlôžková", price: 120 },
@@ -74,14 +180,8 @@ export function Dashboard() {
     let total = 0;
     
     // Registration fee
-    if (participationType === "participant") {
+    if (participationType === "participantWithSubmission" || participationType === "participantWithoutSubmission") {
       total += 100;
-      // Add extra for presentation
-      if (hasSubmission && willPresent) {
-        total += 50; // Extra fee for presentation
-      }
-    } else if (participationType === "student") {
-      total += 50;
     }
 
     // Accommodation
@@ -154,41 +254,91 @@ export function Dashboard() {
               <CardContent className="space-y-6">
                 <RadioGroup value={participationType} onValueChange={setParticipationType}>
                   <Label 
-                    htmlFor="participant"
+                    htmlFor="participantWithSubmission"
                     className="flex items-center space-x-3 p-4 border rounded-lg hover:bg-gray-50 cursor-pointer"
                   >
-                    <RadioGroupItem value="participant" id="participant" />
+                    <RadioGroupItem value="participantWithSubmission" id="participantWithSubmission" />
                     <div className="flex-1">
                       <div className="font-semibold">
-                        Účastník
+                        Účastník s príspevkom
                       </div>
-                      <p className="text-sm text-gray-600">Príspevok v ďalšej fáze</p>
+                      <p className="text-sm text-gray-600">Účasť + vedecký príspevok</p>
                     </div>
                     <Badge variant="secondary">100 €</Badge>
                   </Label>
 
                   <Label 
-                    htmlFor="student"
+                    htmlFor="participantWithoutSubmission"
                     className="flex items-center space-x-3 p-4 border rounded-lg hover:bg-gray-50 cursor-pointer"
                   >
-                    <RadioGroupItem value="student" id="student" />
+                    <RadioGroupItem value="participantWithoutSubmission" id="participantWithoutSubmission" />
                     <div className="flex-1">
                       <div className="font-semibold">
-                        Študent
+                        Účastník bez príspevku
                       </div>
-                      <p className="text-sm text-gray-600">Študentská zľava</p>
+                      <p className="text-sm text-gray-600">Účasť bez príspevku</p>
                     </div>
-                    <Badge variant="secondary">50 €</Badge>
+                    <Badge variant="secondary">100 €</Badge>
                   </Label>
                 </RadioGroup>
 
                 {participationType && (
-                  <Alert className="bg-green-50 border-green-200">
-                    <CheckCircle2 className="h-4 w-4 text-green-600" />
-                    <AlertDescription className="text-green-900">
-                      Vybrali ste si: <strong>{participationType === "student" ? "Študent" : "Účastník"}</strong>
-                    </AlertDescription>
-                  </Alert>
+                  <>
+                    <Alert className="bg-green-50 border-green-200">
+                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                      <AlertDescription className="text-green-900">
+                        Vybrali ste si:{" "}
+                        <strong>
+                          {participationType === "participantWithSubmission"
+                            ? "Účastník s príspevkom"
+                            : "Účastník bez príspevku"}
+                        </strong>
+                      </AlertDescription>
+                    </Alert>
+
+                    <div className="space-y-3 p-4 border rounded-lg bg-gray-50">
+                      <Label className="text-base font-semibold">Študentský status</Label>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="studentStatusDashboard"
+                          checked={isStudent}
+                          onCheckedChange={(checked) => {
+                            const nextIsStudent = checked as boolean;
+                            setIsStudent(nextIsStudent);
+                            if (!nextIsStudent) {
+                              setStudentProofFile(null);
+                            }
+                          }}
+                        />
+                        <Label htmlFor="studentStatusDashboard" className="cursor-pointer">
+                          Som študent
+                        </Label>
+                      </div>
+
+                      {isStudent && (
+                        <div className="space-y-2">
+                          <Label htmlFor="studentProofDashboard">Nahrať overenie študentského statusu</Label>
+                          <Input
+                            id="studentProofDashboard"
+                            type="file"
+                            accept=".pdf,.jpg,.jpeg,.png"
+                            onChange={(e) => setStudentProofFile(e.target.files?.[0] || null)}
+                          />
+                        </div>
+                      )}
+
+                      {saveParticipantError && (
+                        <Alert variant="destructive">
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertDescription>{saveParticipantError}</AlertDescription>
+                        </Alert>
+                      )}
+
+                      {savingParticipant && (
+                        <p className="text-sm text-gray-600">Ukladám zmeny...</p>
+                      )}
+                    </div>
+                  </>
                 )}
               </CardContent>
             </Card>
@@ -200,83 +350,63 @@ export function Dashboard() {
               <CardHeader>
                 <CardTitle>Odoslanie príspevku</CardTitle>
                 <CardDescription>
-                  {participationType === "participant" 
+                  {participationType === "participantWithSubmission" 
                     ? "Vyplňte informácie o vašom príspevku"
                     : "Dostupné len pre účastníkov"}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {participationType === "participant" ? (
+                {participationType === "participantWithSubmission" ? (
                   <>
-                    <div className="flex items-center space-x-2 mb-4">
-                      <Checkbox 
-                        id="hasSubmission" 
-                        checked={hasSubmission}
-                        onCheckedChange={(checked) => setHasSubmission(checked as boolean)}
-                      />
-                      <Label htmlFor="hasSubmission">Chcem odoslať príspevok</Label>
-                    </div>
-
-                    {hasSubmission && (
-                      <div className="space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="title">Názov príspevku *</Label>
-                          <Input
-                            id="title"
-                            value={submission.title}
-                            onChange={(e) => setSubmission({...submission, title: e.target.value})}
-                            placeholder="Názov vášho príspevku"
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="abstract">Abstrakt *</Label>
-                          <Textarea
-                            id="abstract"
-                            value={submission.abstract}
-                            onChange={(e) => setSubmission({...submission, abstract: e.target.value})}
-                            placeholder="Stručný popis vášho príspevku (max 300 slov)"
-                            rows={6}
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="keywords">Kľúčové slová</Label>
-                          <Input
-                            id="keywords"
-                            value={submission.keywords}
-                            onChange={(e) => setSubmission({...submission, keywords: e.target.value})}
-                            placeholder="AI, Machine Learning, Deep Learning"
-                          />
-                        </div>
-
-                        <div className="flex items-center space-x-2">
-                          <Checkbox 
-                            id="willPresent" 
-                            checked={willPresent}
-                            onCheckedChange={(checked) => setWillPresent(checked as boolean)}
-                          />
-                          <Label htmlFor="willPresent">Som prezentér príspevku</Label>
-                        </div>
-
-                        {willPresent && (
-                          <Alert className="bg-blue-50 border-blue-200">
-                            <AlertCircle className="h-4 w-4 text-blue-600" />
-                            <AlertDescription className="text-blue-900 text-sm">
-                              Prezentácia príspevku má príplatok <strong>50 €</strong>, ktorý sa pripočíta k faktúre.
-                            </AlertDescription>
-                          </Alert>
-                        )}
-
-                        <Button className="w-full">Uložiť príspevok</Button>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="title">Názov príspevku *</Label>
+                        <Input
+                          id="title"
+                          value={submission.title}
+                          onChange={(e) => setSubmission({...submission, title: e.target.value})}
+                          placeholder="Názov vášho príspevku"
+                        />
                       </div>
-                    )}
+
+                      <div className="space-y-2">
+                        <Label htmlFor="abstract">Abstrakt *</Label>
+                        <Textarea
+                          id="abstract"
+                          value={submission.abstract}
+                          onChange={(e) => setSubmission({...submission, abstract: e.target.value})}
+                          placeholder="Stručný popis vášho príspevku (max 300 slov)"
+                          rows={6}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="keywords">Kľúčové slová</Label>
+                        <Input
+                          id="keywords"
+                          value={submission.keywords}
+                          onChange={(e) => setSubmission({...submission, keywords: e.target.value})}
+                          placeholder="AI, Machine Learning, Deep Learning"
+                        />
+                      </div>
+
+                      <div className="flex items-center space-x-2">
+                        <Checkbox 
+                          id="willPresent" 
+                          checked={willPresent}
+                          onCheckedChange={(checked) => setWillPresent(checked as boolean)}
+                        />
+                        <Label htmlFor="willPresent">Som prezentér príspevku</Label>
+                      </div>
+
+                      <Button className="w-full">Uložiť príspevok</Button>
+                    </div>
                   </>
                 ) : (
                   <Alert>
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>
-                      Pre odoslanie príspevku musíte vybrať typ účasti "Účastník"
+                      Pre odoslanie príspevku musíte vybrať typ účasti "Účastník s príspevkom"
                     </AlertDescription>
                   </Alert>
                 )}
@@ -496,16 +626,12 @@ export function Dashboard() {
                     <div className="space-y-2 text-sm">
                       {participationType && (
                         <div className="flex justify-between py-2 border-b">
-                          <span>Registračný poplatok ({participationType === "student" ? "Študent" : "Účastník"})</span>
-                          <span className="font-semibold whitespace-nowrap">
-                            {participationType === "student" ? "50" : "100"} €
+                          <span>
+                            Registračný poplatok ({participationType === "participantWithSubmission" ? "Účastník s príspevkom" : "Účastník bez príspevku"})
                           </span>
-                        </div>
-                      )}
-                      {hasSubmission && willPresent && participationType === "participant" && (
-                        <div className="flex justify-between py-2 border-b">
-                          <span>Prezentácia príspevku</span>
-                          <span className="font-semibold whitespace-nowrap">50 €</span>
+                          <span className="font-semibold whitespace-nowrap">
+                            100 €
+                          </span>
                         </div>
                       )}
                       {accommodation && (
