@@ -16,6 +16,31 @@ import {
   CheckCircle2, Clock, AlertCircle, Download, Copy, Users
 } from "lucide-react";
 import { getParticipantByUserId, updateParticipant, type ParticipantPayload } from "../api/participantApi.ts";
+import { getActiveConferences } from "../api/conferenceApi.ts";
+import { uploadParticipantFile } from "../api/fileManagerApi.ts";
+import { toast } from "sonner";
+
+const STUDENT_VERIFICATION_FILE_TYPE = 0;
+const WAITING_FOR_APPROVAL_STATUS = 0;
+const APPROVED_STATUS = 1;
+const REJECTED_STATUS = 2;
+
+const normalizeFileType = (value: number | string) => {
+  if (typeof value === "number") return value;
+  const normalized = value.toLowerCase();
+  if (normalized === "studentverification") return 0;
+  if (normalized === "submission") return 1;
+  return null;
+};
+
+const normalizeFileStatus = (value: number | string) => {
+  if (typeof value === "number") return value;
+  const normalized = value.toLowerCase();
+  if (normalized === "waitingforapproval") return 0;
+  if (normalized === "approved") return 1;
+  if (normalized === "rejected") return 2;
+  return null;
+};
 
 export function Dashboard() {
   const navigate = useNavigate();
@@ -24,6 +49,8 @@ export function Dashboard() {
   const [isStudent, setIsStudent] = useState(false);
   const [studentProofFile, setStudentProofFile] = useState<File | null>(null);
   const [participantDraft, setParticipantDraft] = useState<ParticipantPayload | null>(null);
+  const [savedRegistrationType, setSavedRegistrationType] = useState<ParticipantPayload["registrationType"]>(null);
+  const [savedIsStudent, setSavedIsStudent] = useState(false);
   const [savingParticipant, setSavingParticipant] = useState(false);
   const [saveParticipantError, setSaveParticipantError] = useState("");
   const [willPresent, setWillPresent] = useState(false);
@@ -49,6 +76,21 @@ export function Dashboard() {
     address: "",
   });
 
+  const applyParticipantState = (participant: ParticipantPayload) => {
+    setParticipantDraft(participant);
+    localStorage.setItem("participantDraft", JSON.stringify(participant));
+    setParticipationType(
+      participant.registrationType === 1
+        ? "participantWithSubmission"
+        : participant.registrationType === 2
+          ? "participantWithoutSubmission"
+          : ""
+    );
+    setIsStudent(participant.isStudent);
+    setSavedRegistrationType(participant.registrationType);
+    setSavedIsStudent(participant.isStudent);
+  };
+
   useEffect(() => {
     const user = localStorage.getItem("currentUser");
     if (!user) {
@@ -69,29 +111,12 @@ export function Dashboard() {
     const loadParticipant = async () => {
       try {
         const participant = await getParticipantByUserId(currentUser.id);
-        setParticipantDraft(participant);
-        localStorage.setItem("participantDraft", JSON.stringify(participant));
-        setParticipationType(
-          participant.registrationType === 1
-            ? "participantWithSubmission"
-            : participant.registrationType === 2
-              ? "participantWithoutSubmission"
-              : ""
-        );
-        setIsStudent(participant.studentStatus !== 0);
+        applyParticipantState(participant);
       } catch {
         const stored = localStorage.getItem("participantDraft");
         if (stored) {
           const parsed = JSON.parse(stored) as ParticipantPayload;
-          setParticipantDraft(parsed);
-          setParticipationType(
-            parsed.registrationType === 1
-              ? "participantWithSubmission"
-              : parsed.registrationType === 2
-                ? "participantWithoutSubmission"
-                : ""
-          );
-          setIsStudent(parsed.studentStatus !== 0);
+          applyParticipantState(parsed);
         } else {
           const nameParts = (currentUser.name || "").trim().split(" ");
           const firstName = nameParts[0] || "";
@@ -103,13 +128,13 @@ export function Dashboard() {
             phone: null,
             affiliation: null,
             country: null,
-            registrationType: 0,
-            studentStatus: 0,
+            registrationType: null,
+            isStudent: false,
+            fileManagers: [],
             userId: currentUser.id ?? 0,
             conferenceId: currentUser.conferenceId ?? 0
           };
-          setParticipantDraft(draft);
-          localStorage.setItem("participantDraft", JSON.stringify(draft));
+          applyParticipantState(draft);
         }
       }
     };
@@ -126,6 +151,50 @@ export function Dashboard() {
     });
   };
 
+  const handleSaveParticipation = async () => {
+    if (!participantDraft) return;
+    if (participantDraft.registrationType === null && !participantDraft.isStudent) {
+      setSaveParticipantError("Vyberte typ účasti alebo študentský status.");
+      return;
+    }
+
+    setSavingParticipant(true);
+    setSaveParticipantError("");
+    try {
+      let payload = participantDraft;
+
+      if (!payload.conferenceId || payload.conferenceId === 0) {
+        const activeConferences = await getActiveConferences();
+        const activeConference = activeConferences[0];
+        if (!activeConference) {
+          throw new Error("Aktívna konferencia nebola nájdená.");
+        }
+        payload = { ...payload, conferenceId: activeConference.id };
+        updateDraft({ conferenceId: activeConference.id });
+      }
+
+      const savedParticipant = await updateParticipant(payload);
+
+      if (
+        savedParticipant.isStudent &&
+        studentProofFile &&
+        !isStudentStatusLocked &&
+        savedParticipant.id > 0
+      ) {
+        await uploadParticipantFile(savedParticipant.id, STUDENT_VERIFICATION_FILE_TYPE, studentProofFile);
+      }
+
+      const refreshedParticipant = await getParticipantByUserId(currentUser.id);
+      applyParticipantState(refreshedParticipant);
+      setStudentProofFile(null);
+      toast.success("Zmeny sú uložené v databáze");
+    } catch (error) {
+      setSaveParticipantError(error instanceof Error ? error.message : "Uloženie zlyhalo");
+    } finally {
+      setSavingParticipant(false);
+    }
+  };
+
   useEffect(() => {
     if (!participantDraft) return;
     const registrationType =
@@ -133,36 +202,10 @@ export function Dashboard() {
         ? 1
         : participationType === "participantWithoutSubmission"
           ? 2
-          : 0;
+          : null;
 
-    let studentStatus: ParticipantPayload["studentStatus"] = 0;
-    if (isStudent) {
-      studentStatus = studentProofFile ? 2 : 1;
-    }
-
-    updateDraft({ registrationType, studentStatus });
+    updateDraft({ registrationType, isStudent });
   }, [participationType, isStudent, studentProofFile]);
-
-  useEffect(() => {
-    if (!participantDraft) return;
-    if (participantDraft.registrationType === 0 && participantDraft.studentStatus === 0) {
-      return;
-    }
-
-    const timeout = window.setTimeout(async () => {
-      setSavingParticipant(true);
-      setSaveParticipantError("");
-      try {
-        await updateParticipant(participantDraft);
-      } catch (error) {
-        setSaveParticipantError(error instanceof Error ? error.message : "Uloženie zlyhalo");
-      } finally {
-        setSavingParticipant(false);
-      }
-    }, 600);
-
-    return () => window.clearTimeout(timeout);
-  }, [participantDraft]);
 
   const accommodationOptions = [
     { id: 1, name: "Hotel Devín - Jednolôžková", price: 85 },
@@ -210,6 +253,41 @@ export function Dashboard() {
     alert("Faktúra sa sťahuje...");
   };
 
+  const participationTypeLabel =
+    savedRegistrationType === 1
+      ? "Účastník s príspevkom"
+      : savedRegistrationType === 2
+        ? "Účastník bez príspevku"
+        : "Nezvolený";
+
+  const studentVerificationFile = participantDraft?.fileManagers?.find(
+    (file) => normalizeFileType(file.fileType) === STUDENT_VERIFICATION_FILE_TYPE
+  );
+  const studentVerificationStatus = studentVerificationFile
+    ? normalizeFileStatus(studentVerificationFile.fileStatus)
+    : null;
+  const isStudentStatusLocked = Boolean(
+    participantDraft?.isStudent &&
+      studentVerificationFile &&
+      studentVerificationStatus !== REJECTED_STATUS
+  );
+
+  const studentStatusLabel = (() => {
+    if (!savedIsStudent) return "Nie";
+    if (!studentVerificationFile) return "Zvolený, neposlaný";
+    if (studentVerificationStatus === WAITING_FOR_APPROVAL_STATUS) return "Čaká na schválenie";
+    if (studentVerificationStatus === APPROVED_STATUS) return "Áno";
+    if (studentVerificationStatus === REJECTED_STATUS) return "Zamietnutý, pošlite iné potvrdenie";
+    return "Zvolený, neschválený";
+  })();
+
+  const hasParticipationChanges = Boolean(
+    participantDraft &&
+      (participantDraft.registrationType !== savedRegistrationType ||
+        participantDraft.isStudent !== savedIsStudent ||
+        (participantDraft.isStudent && !isStudentStatusLocked && Boolean(studentProofFile)))
+  );
+
   if (!currentUser) return null;
 
   return (
@@ -218,6 +296,26 @@ export function Dashboard() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold">Vitajte, {currentUser.name}!</h1>
           <p className="text-gray-600 mt-2">Správa vašej účasti na konferencii</p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600">Účasť</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-base font-semibold">{participationTypeLabel}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600">Študent</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-base font-semibold">{studentStatusLabel}</div>
+            </CardContent>
+          </Card>
         </div>
 
         <Tabs defaultValue="participation" className="space-y-6">
@@ -284,24 +382,13 @@ export function Dashboard() {
 
                 {participationType && (
                   <>
-                    <Alert className="bg-green-50 border-green-200">
-                      <CheckCircle2 className="h-4 w-4 text-green-600" />
-                      <AlertDescription className="text-green-900">
-                        Vybrali ste si:{" "}
-                        <strong>
-                          {participationType === "participantWithSubmission"
-                            ? "Účastník s príspevkom"
-                            : "Účastník bez príspevku"}
-                        </strong>
-                      </AlertDescription>
-                    </Alert>
-
                     <div className="space-y-3 p-4 border rounded-lg bg-gray-50">
                       <Label className="text-base font-semibold">Študentský status</Label>
                       <div className="flex items-center space-x-2">
                         <Checkbox
                           id="studentStatusDashboard"
                           checked={isStudent}
+                          disabled={isStudentStatusLocked}
                           onCheckedChange={(checked) => {
                             const nextIsStudent = checked as boolean;
                             setIsStudent(nextIsStudent);
@@ -315,7 +402,19 @@ export function Dashboard() {
                         </Label>
                       </div>
 
-                      {isStudent && (
+                      {isStudentStatusLocked && studentVerificationStatus === WAITING_FOR_APPROVAL_STATUS && (
+                        <p className="text-sm text-gray-600">
+                          Študentský status čaká na schválenie. Zmenu momentálne nie je možné vykonať.
+                        </p>
+                      )}
+
+                      {isStudentStatusLocked && studentVerificationStatus === APPROVED_STATUS && (
+                        <p className="text-sm text-gray-600">
+                          Študentský status bol schválený. Zmenu nie je možné vykonať.
+                        </p>
+                      )}
+
+                      {isStudent && !isStudentStatusLocked && (
                         <div className="space-y-2">
                           <Label htmlFor="studentProofDashboard">Nahrať overenie študentského statusu</Label>
                           <Input
@@ -334,10 +433,21 @@ export function Dashboard() {
                         </Alert>
                       )}
 
-                      {savingParticipant && (
-                        <p className="text-sm text-gray-600">Ukladám zmeny...</p>
-                      )}
                     </div>
+
+                    <div className="flex justify-end">
+                      <Button
+                        type="button"
+                        onClick={handleSaveParticipation}
+                        disabled={savingParticipant || !hasParticipationChanges}
+                      >
+                        Uložiť
+                      </Button>
+                    </div>
+
+                    {savingParticipant && (
+                      <p className="text-sm text-gray-600">Ukladám zmeny...</p>
+                    )}
                   </>
                 )}
               </CardContent>

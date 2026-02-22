@@ -31,7 +31,7 @@ import {
 import { Checkbox } from "../components/ui/checkbox.tsx";
 import { 
   Plus, Check, Clock, Download, Building2, 
-  Pencil, Trash2, Users, Receipt, FileText 
+  Pencil, Trash2, Users, Receipt
 } from "lucide-react";
 import {
   getAllConferences,
@@ -39,6 +39,10 @@ import {
   updateConference,
   deleteConference
 } from "../api/conferenceApi.ts";
+import { getParticipantsByActiveConference, type FileManagerPayload } from "../api/participantApi.ts";
+import { BASE_URL } from "../api/baseApi.ts";
+import { approveFileManager, rejectFileManager } from "../api/fileManagerApi.ts";
+import { toast } from "sonner";
 
 type Conference = {
   id: number;
@@ -54,12 +58,97 @@ type Participant = {
   id: number;
   firstName: string;
   lastName: string;
+  registrationType: number | null;
+  isStudent: boolean;
+  fileManagers: FileManagerPayload[];
   email: string;
   phone: string;
   affiliation: string;
+  country: string;
   type: string;
   registrationDate: string;
   invoiceStatus?: "pending" | "paid" | "none";
+};
+
+const STUDENT_VERIFICATION_FILE_TYPE = 0;
+const WAITING_FOR_APPROVAL_STATUS = 0;
+const APPROVED_STATUS = 1;
+const REJECTED_STATUS = 2;
+
+const normalizeFileType = (value: number | string) => {
+  if (typeof value === "number") return value;
+  const normalized = value.toLowerCase();
+  if (normalized === "studentverification") return 0;
+  if (normalized === "submission") return 1;
+  return null;
+};
+
+const normalizeFileStatus = (value: number | string) => {
+  if (typeof value === "number") return value;
+  const normalized = value.toLowerCase();
+  if (normalized === "waitingforapproval") return 0;
+  if (normalized === "approved") return 1;
+  if (normalized === "rejected") return 2;
+  return null;
+};
+
+const getLatestStudentVerificationFile = (participant: Participant) => {
+  return participant.fileManagers
+    .filter((file) => normalizeFileType(file.fileType) === STUDENT_VERIFICATION_FILE_TYPE)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0] ?? null;
+};
+
+const getRegistrationTypeLabel = (registrationType: number | null) => {
+  if (registrationType === 1) return "Účastník s príspevkom";
+  if (registrationType === 2) return "Účastník bez príspevku";
+  return "Nezvolený";
+};
+
+const getStudentLabel = (participant: Participant) => {
+  if (!participant.isStudent) return "Nie";
+  const latestStudentFile = getLatestStudentVerificationFile(participant);
+  if (!latestStudentFile) return "Zvolený, neschválený";
+
+  const latestStudentFileStatus = normalizeFileStatus(latestStudentFile.fileStatus);
+  if (latestStudentFileStatus === WAITING_FOR_APPROVAL_STATUS) return "Čaká na schválenie";
+  if (latestStudentFileStatus === APPROVED_STATUS) return "Schválené";
+  if (latestStudentFileStatus === REJECTED_STATUS) return "Zamietnutý";
+  return "Zvolený, neschválený";
+};
+
+const getStudentStatusBadgeClass = (participant: Participant) => {
+  const label = getStudentLabel(participant);
+  if (label === "Schválené") return "bg-green-100 text-green-800 border-green-200";
+  if (label === "Čaká na schválenie") return "bg-yellow-100 text-yellow-800 border-yellow-200";
+  if (label === "Zamietnutý") return "bg-red-100 text-red-800 border-red-200";
+  if (label === "Zvolený, neschválený") return "bg-orange-100 text-orange-800 border-orange-200";
+  return "bg-gray-100 text-gray-700 border-gray-200";
+};
+
+const getStudentFileHistory = (participant: Participant) =>
+  participant.fileManagers
+    .filter((file) => normalizeFileType(file.fileType) === STUDENT_VERIFICATION_FILE_TYPE)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+const getFileStatusLabel = (file: FileManagerPayload) => {
+  const status = normalizeFileStatus(file.fileStatus);
+  if (status === WAITING_FOR_APPROVAL_STATUS) return "Čaká na schválenie";
+  if (status === APPROVED_STATUS) return "Schválené";
+  if (status === REJECTED_STATUS) return "Zamietnutý";
+  return "Neznámy";
+};
+
+const getFileStatusBadgeClass = (file: FileManagerPayload) => {
+  const label = getFileStatusLabel(file);
+  if (label === "Schválené") return "bg-green-100 text-green-800 border-green-200";
+  if (label === "Čaká na schválenie") return "bg-yellow-100 text-yellow-800 border-yellow-200";
+  if (label === "Zamietnutý") return "bg-red-100 text-red-800 border-red-200";
+  return "bg-gray-100 text-gray-700 border-gray-200";
+};
+
+const isImageFile = (fileName: string) => {
+  const name = fileName.toLowerCase();
+  return name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".png") || name.endsWith(".webp");
 };
 
 type Invoice = {
@@ -81,38 +170,7 @@ export function Admin() {
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [conferences, setConferences] = useState<Conference[]>([]);
-  const [participants, setParticipants] = useState<Participant[]>([
-    {
-      id: 1,
-      firstName: "Ján",
-      lastName: "Novák",
-      email: "jan.novak@example.com",
-      phone: "+421 900 123 456",
-      affiliation: "Slovak University of Technology",
-      type: "participant",
-      registrationDate: "2026-02-01",
-    },
-    {
-      id: 2,
-      firstName: "Mária",
-      lastName: "Horváthová",
-      email: "maria.horvath@example.com",
-      phone: "+421 900 654 321",
-      affiliation: "Comenius University",
-      type: "participant",
-      registrationDate: "2026-02-05",
-    },
-    {
-      id: 3,
-      firstName: "Peter",
-      lastName: "Kováč",
-      email: "peter.kovac@example.com",
-      phone: "+421 900 111 222",
-      affiliation: "University of Zilina",
-      type: "student",
-      registrationDate: "2026-02-08",
-    },
-  ]);
+  const [participants, setParticipants] = useState<Participant[]>([]);
 
   const [invoices, setInvoices] = useState<Invoice[]>([
     {
@@ -150,6 +208,9 @@ export function Admin() {
   const [editConferenceDialog, setEditConferenceDialog] = useState(false);
   const [deleteConfDialog, setDeleteConfDialog] = useState<number | null>(null);
   const [editParticipantDialog, setEditParticipantDialog] = useState(false);
+  const [studentFileDialog, setStudentFileDialog] = useState(false);
+  const [studentFileParticipant, setStudentFileParticipant] = useState<Participant | null>(null);
+  const [studentStatusActionLoading, setStudentStatusActionLoading] = useState<"approve" | "reject" | null>(null);
   const [deletePartDialog, setDeletePartDialog] = useState<number | null>(null);
   const [newInvoiceDialog, setNewInvoiceDialog] = useState(false);
   const [editInvoiceDialog, setEditInvoiceDialog] = useState(false);
@@ -182,6 +243,7 @@ export function Admin() {
 
   useEffect(() => {
     loadConferences();
+    loadParticipants();
   }, []);
 
   const loadConferences = async () => {
@@ -196,6 +258,43 @@ export function Admin() {
       setConferences(normalized);
     } catch (error) {
       console.error("Failed to load conferences", error);
+    }
+  };
+
+  const loadParticipants = async (): Promise<Participant[]> => {
+    try {
+      const data = await getParticipantsByActiveConference();
+      const normalized = Array.isArray(data)
+        ? data.map((participant) => {
+            const registrationDateRaw = participant.createdAt ?? "";
+            const registrationDate = registrationDateRaw
+              ? registrationDateRaw.split("T")[0]
+              : "-";
+
+            return {
+              id: participant.id,
+              firstName: participant.firstName ?? "",
+              lastName: participant.lastName ?? "",
+              registrationType: participant.registrationType,
+              isStudent: participant.isStudent,
+              fileManagers: participant.fileManagers ?? [],
+              email: participant.user?.email ?? "",
+              phone: participant.phone ?? "",
+              affiliation: participant.affiliation ?? "",
+              country: participant.country ?? "",
+              type: participant.isStudent ? "student" : "participant",
+              registrationDate,
+              invoiceStatus: "none" as const
+            };
+          })
+        : [];
+
+      setParticipants(normalized);
+      return normalized;
+    } catch (error) {
+      console.error("Failed to load participants", error);
+      setParticipants([]);
+      return [];
     }
   };
 
@@ -316,6 +415,40 @@ export function Admin() {
   const handleDeleteInvoice = (id: number) => {
     setInvoices(invoices.filter(i => i.id !== id));
     setDeleteInvoiceDialog(null);
+  };
+
+  const getFileViewUrl = (fileManagerId: number) => `${BASE_URL}/api/file-manager/view/${fileManagerId}`;
+  const getFileDownloadUrl = (fileManagerId: number) => `${BASE_URL}/api/file-manager/download/${fileManagerId}`;
+
+  const openStudentStatusDialog = (participant: Participant) => {
+    if (!participant.isStudent) return;
+    setStudentFileParticipant(participant);
+    setStudentFileDialog(true);
+  };
+
+  const handleStudentStatusAction = async (action: "approve" | "reject", fileManagerId: number) => {
+    if (!currentUser?.email) return;
+    setStudentStatusActionLoading(action);
+    try {
+      if (action === "approve") {
+        await approveFileManager(fileManagerId, currentUser.email);
+        toast.success("Doklad bol schválený.");
+      } else {
+        await rejectFileManager(fileManagerId, currentUser.email);
+        toast.success("Doklad bol zamietnutý.");
+      }
+
+      const refreshedParticipants = await loadParticipants();
+      if (studentFileParticipant) {
+        const refreshed = refreshedParticipants.find((p) => p.id === studentFileParticipant.id) ?? null;
+        setStudentFileParticipant(refreshed);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Operácia zlyhala";
+      toast.error(message);
+    } finally {
+      setStudentStatusActionLoading(null);
+    }
   };
 
   const stats = {
@@ -552,10 +685,8 @@ export function Admin() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Meno</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Typ</TableHead>
-                        <TableHead>Dátum registrácie</TableHead>
-                        <TableHead>Faktúra</TableHead>
+                        <TableHead>Typ registrácie</TableHead>
+                        <TableHead>Študentský status</TableHead>
                         <TableHead className="text-right">Akcie</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -565,39 +696,22 @@ export function Admin() {
                           <TableCell className="font-medium">
                             {participant.firstName} {participant.lastName}
                           </TableCell>
-                          <TableCell>{participant.email}</TableCell>
                           <TableCell>
                             <Badge variant="secondary">
-                              {participant.type === "speaker" ? "Prednášajúci" : "Účastník"}
+                              {getRegistrationTypeLabel(participant.registrationType)}
                             </Badge>
                           </TableCell>
-                          <TableCell>{participant.registrationDate}</TableCell>
                           <TableCell>
-                            {participant.invoiceStatus === "paid" ? (
-                              <Badge className="bg-green-500">
-                                <Check className="w-3 h-3 mr-1" />
-                                Zaplatené
-                              </Badge>
-                            ) : participant.invoiceStatus === "pending" ? (
-                              <Badge variant="outline" className="border-yellow-500 text-yellow-700">
-                                <Clock className="w-3 h-3 mr-1" />
-                                Čaká
-                              </Badge>
-                            ) : (
-                              <Badge variant="secondary">Žiadna</Badge>
-                            )}
+                            <Badge
+                              variant="outline"
+                              className={`${getStudentStatusBadgeClass(participant)} ${participant.isStudent ? "cursor-pointer hover:opacity-80" : ""}`}
+                              onClick={() => openStudentStatusDialog(participant)}
+                            >
+                              {getStudentLabel(participant)}
+                            </Badge>
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
-                              {participant.invoiceStatus === "pending" && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleUpdateInvoiceStatus(participant.id, "paid")}
-                                >
-                                  Označiť ako zaplatené
-                                </Button>
-                              )}
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -629,69 +743,45 @@ export function Admin() {
                   {participants.map((participant) => (
                     <div key={participant.id} className="border rounded-lg p-4 space-y-3">
                       <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0 flex-1">
-                          <h3 className="font-semibold break-words">
-                            {participant.firstName} {participant.lastName}
-                          </h3>
-                          <p className="text-sm text-gray-600 break-all">{participant.email}</p>
-                        </div>
-                        <Badge variant="secondary" className="shrink-0">
-                          {participant.type === "speaker" ? "Predn." : "Účast."}
-                        </Badge>
-                      </div>
-                      
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-600">Registrácia:</span>
-                        <span className="font-medium">{participant.registrationDate}</span>
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600">Faktúra:</span>
-                        {participant.invoiceStatus === "paid" ? (
-                          <Badge className="bg-green-500 shrink-0">
-                            <Check className="w-3 h-3 mr-1" />
-                            Zaplatené
-                          </Badge>
-                        ) : participant.invoiceStatus === "pending" ? (
-                          <Badge variant="outline" className="border-yellow-500 text-yellow-700 shrink-0">
-                            <Clock className="w-3 h-3 mr-1" />
-                            Čaká
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary" className="shrink-0">Žiadna</Badge>
-                        )}
-                      </div>
-
-                      <div className="flex gap-2 pt-2 border-t">
-                        {participant.invoiceStatus === "pending" && (
+                        <h3 className="font-semibold break-words">
+                          {participant.firstName} {participant.lastName}
+                        </h3>
+                        <div className="flex gap-2">
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleUpdateInvoiceStatus(participant.id, "paid")}
-                            className="flex-1 text-xs"
+                            onClick={() => {
+                              setEditParticipant(participant);
+                              setEditParticipantDialog(true);
+                            }}
                           >
-                            <Check className="w-4 h-4 mr-1" />
-                            Zaplatené
+                            <Pencil className="w-4 h-4" />
                           </Button>
-                        )}
-                        <Button
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setDeletePartDialog(participant.id)}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600">Typ registrácie:</span>
+                        <Badge variant="secondary">{getRegistrationTypeLabel(participant.registrationType)}</Badge>
+                      </div>
+
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600">Študentský status:</span>
+                        <Badge
                           variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setEditParticipant(participant);
-                            setEditParticipantDialog(true);
-                          }}
+                          className={`${getStudentStatusBadgeClass(participant)} ${participant.isStudent ? "cursor-pointer hover:opacity-80" : ""}`}
+                          onClick={() => openStudentStatusDialog(participant)}
                         >
-                          <Pencil className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setDeletePartDialog(participant.id)}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                          {getStudentLabel(participant)}
+                        </Badge>
                       </div>
                     </div>
                   ))}
@@ -955,20 +1045,12 @@ export function Admin() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="editType">Typ účastníka</Label>
-                  <Select
-                    value={editParticipant.type}
-                    onValueChange={(value) => setEditParticipant({ ...editParticipant, type: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="participant">Účastník</SelectItem>
-                      <SelectItem value="speaker">Prednášajúci</SelectItem>
-                      <SelectItem value="student">Študent</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Label htmlFor="editCountry">Krajina</Label>
+                  <Input
+                    id="editCountry"
+                    value={editParticipant.country}
+                    onChange={(e) => setEditParticipant({ ...editParticipant, country: e.target.value })}
+                  />
                 </div>
               </div>
             )}
@@ -978,6 +1060,188 @@ export function Admin() {
               </Button>
               <Button onClick={handleUpdateParticipant}>Uložiť</Button>
             </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Student File Dialog */}
+        <Dialog open={studentFileDialog} onOpenChange={setStudentFileDialog}>
+          <DialogContent className="sm:max-w-3xl max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Študentský status</DialogTitle>
+              <DialogDescription>Stiahnutie a správa overenia študentského statusu</DialogDescription>
+            </DialogHeader>
+            {studentFileParticipant && (
+              <div className="space-y-4 py-2">
+                <div className="space-y-1">
+                  <p className="text-sm text-gray-600">Účastník</p>
+                  <p className="font-medium break-words">
+                    {studentFileParticipant.firstName} {studentFileParticipant.lastName}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm text-gray-600">Status</p>
+                  <Badge variant="outline" className={getStudentStatusBadgeClass(studentFileParticipant)}>
+                    {getStudentLabel(studentFileParticipant)}
+                  </Badge>
+                </div>
+                {(() => {
+                  const history = getStudentFileHistory(studentFileParticipant);
+                  const latestStudentFile = history[0];
+                  const historyWithoutLatest = history.slice(1);
+                  if (!latestStudentFile) {
+                    return (
+                      <p className="text-sm text-gray-600">
+                        Pre tohto účastníka zatiaľ nie je nahratý doklad študentského statusu.
+                      </p>
+                    );
+                  }
+
+                  const fileViewUrl = getFileViewUrl(latestStudentFile.id);
+                  const fileDownloadUrl = getFileDownloadUrl(latestStudentFile.id);
+                  const fileName = latestStudentFile.originalFileName || latestStudentFile.fileName;
+                  const imageFile = isImageFile(fileName);
+                  return (
+                    <div className="space-y-3">
+                      <div className="space-y-1">
+                        <p className="text-sm text-gray-600">Aktuálny súbor</p>
+                        <p className="font-medium break-all">{fileName}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => window.open(fileViewUrl, "_blank", "noopener,noreferrer")}
+                        className="w-full sm:w-64 border rounded-lg bg-gray-50 overflow-hidden text-left"
+                        title="Otvoriť náhľad"
+                      >
+                        {imageFile ? (
+                          <img
+                            src={fileViewUrl}
+                            alt={fileName}
+                            className="w-full h-32 object-cover"
+                          />
+                        ) : (
+                          <div className="h-32 flex items-center justify-center text-sm text-gray-600">
+                            PDF náhľad
+                          </div>
+                        )}
+                      </button>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            const link = document.createElement("a");
+                            link.href = fileDownloadUrl;
+                            link.download = fileName;
+                            document.body.appendChild(link);
+                            link.click();
+                            link.remove();
+                          }}
+                          disabled={!latestStudentFile.id}
+                        >
+                          Stiahnuť
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={() => handleStudentStatusAction("approve", latestStudentFile.id)}
+                          disabled={!latestStudentFile.id || studentStatusActionLoading !== null}
+                        >
+                          Schváliť
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          onClick={() => handleStudentStatusAction("reject", latestStudentFile.id)}
+                          disabled={!latestStudentFile.id || studentStatusActionLoading !== null}
+                        >
+                          Zamietnuť
+                        </Button>
+                      </div>
+
+                      <div className="pt-2">
+                        <p className="text-sm text-gray-600 mb-2">História dokladov</p>
+                        <div className="border rounded-lg overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Názov</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead className="text-right">Akcie</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {historyWithoutLatest.map((file) => {
+                                const fileHistoryViewUrl = getFileViewUrl(file.id);
+                                const fileHistoryDownloadUrl = getFileDownloadUrl(file.id);
+                                const fileHistoryName = file.originalFileName || file.fileName;
+                                const historyImageFile = isImageFile(fileHistoryName);
+                                return (
+                                  <TableRow key={file.id}>
+                                    <TableCell className="max-w-[320px] whitespace-normal break-all">
+                                      <div className="space-y-2">
+                                        <p>{fileHistoryName}</p>
+                                        <button
+                                          type="button"
+                                          onClick={() => window.open(fileHistoryViewUrl, "_blank", "noopener,noreferrer")}
+                                          className="w-24 border rounded bg-gray-50 overflow-hidden text-left"
+                                          title="Otvoriť náhľad"
+                                        >
+                                          {historyImageFile ? (
+                                            <img
+                                              src={fileHistoryViewUrl}
+                                              alt={fileHistoryName}
+                                              className="w-full h-16 object-cover"
+                                            />
+                                          ) : (
+                                            <div className="h-16 flex items-center justify-center text-[11px] text-gray-600">
+                                              PDF
+                                            </div>
+                                          )}
+                                        </button>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell>
+                                      <Badge variant="outline" className={getFileStatusBadgeClass(file)}>
+                                        {getFileStatusLabel(file)}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                      <div className="flex flex-wrap justify-end gap-2">
+                                        <Button
+                                          type="button"
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => {
+                                            const link = document.createElement("a");
+                                            link.href = fileHistoryDownloadUrl;
+                                            link.download = fileHistoryName;
+                                            document.body.appendChild(link);
+                                            link.click();
+                                            link.remove();
+                                          }}
+                                        >
+                                          Stiahnuť
+                                        </Button>
+                                      </div>
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                              {historyWithoutLatest.length === 0 && (
+                                <TableRow>
+                                  <TableCell colSpan={3} className="text-sm text-gray-600">
+                                    Bez starších záznamov.
+                                  </TableCell>
+                                </TableRow>
+                              )}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
           </DialogContent>
         </Dialog>
 
