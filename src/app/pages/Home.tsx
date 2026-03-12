@@ -1,6 +1,6 @@
 import { Link } from "react-router";
 import { Button } from "../components/ui/button.tsx";
-import { Card, CardContent } from "../components/ui/card.tsx";
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card.tsx";
 import { Calendar, Users, FileText, MapPin } from "lucide-react";
 import { ImageWithFallback } from "../components/figma/ImageWithFallback.tsx";
 
@@ -142,6 +142,48 @@ export function Home() {
               />
             </div>
           </div>
+        </div>
+      </section>
+
+      <section className="py-16 bg-white">
+        <div className="container mx-auto px-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Dôležité termíny</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="flex gap-4">
+                  <div className="text-blue-600 font-bold text-lg">1.3.2026</div>
+                  <div>
+                    <div className="font-semibold">Uzávierka prihlášok</div>
+                    <div className="text-gray-600 text-sm">Posledný termín na odoslanie príspevkov</div>
+                  </div>
+                </div>
+                <div className="flex gap-4">
+                  <div className="text-blue-600 font-bold text-lg">1.4.2026</div>
+                  <div>
+                    <div className="font-semibold">Notifikácia o prijatí</div>
+                    <div className="text-gray-600 text-sm">Oznámenie o prijatí alebo zamietnutí príspevku</div>
+                  </div>
+                </div>
+                <div className="flex gap-4">
+                  <div className="text-blue-600 font-bold text-lg">15.4.2026</div>
+                  <div>
+                    <div className="font-semibold">Skorá registrácia</div>
+                    <div className="text-gray-600 text-sm">Koniec zľavneného registračného poplatku</div>
+                  </div>
+                </div>
+                <div className="flex gap-4">
+                  <div className="text-blue-600 font-bold text-lg">15-17.5.2026</div>
+                  <div>
+                    <div className="font-semibold">Konferencia</div>
+                    <div className="text-gray-600 text-sm">Hlavné dni podujatia</div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </section>
 

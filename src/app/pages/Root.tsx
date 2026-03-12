@@ -24,7 +24,6 @@ export function Root() {
 
   const navigation = [
     { name: "Domov", href: "/" },
-    { name: "O konferencii", href: "/about" },
     { name: "Program", href: "/schedule" },
     { name: "Prednášajúci", href: "/speakers" },
     { name: "Registrácia", href: "/register" },
@@ -170,11 +169,6 @@ export function Root() {
             <div>
               <h4 className="font-semibold mb-4">Dôležité odkazy</h4>
               <ul className="space-y-2 text-sm text-gray-600">
-                <li>
-                  <Link to="/about" className="hover:text-blue-600">
-                    O konferencii
-                  </Link>
-                </li>
                 <li>
                   <Link to="/schedule" className="hover:text-blue-600">
                     Program

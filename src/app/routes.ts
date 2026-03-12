@@ -1,7 +1,6 @@
 import { createBrowserRouter } from "react-router";
 import { Root } from "./pages/Root.tsx";
 import { Home } from "./pages/Home.tsx";
-import { About } from "./pages/About.tsx";
 import { Schedule } from "./pages/Schedule.tsx";
 import { Speakers } from "./pages/Speakers.tsx";
 import { Submissions } from "./pages/Submissions.tsx";
@@ -17,7 +16,6 @@ export const router = createBrowserRouter([
     Component: Root,
     children: [
       { index: true, Component: Home },
-      { path: "about", Component: About },
       { path: "schedule", Component: Schedule },
       { path: "speakers", Component: Speakers },
       { path: "submissions", Component: Submissions },
