@@ -18,9 +18,11 @@ import {
 import { getParticipantByUserId, updateParticipant, type ParticipantPayload } from "../api/participantApi.ts";
 import { getActiveConferences } from "../api/conferenceApi.ts";
 import { uploadParticipantFile } from "../api/fileManagerApi.ts";
+import { BASE_URL } from "../api/baseApi.ts";
 import { toast } from "sonner";
 
 const STUDENT_VERIFICATION_FILE_TYPE = 0;
+const SUBMISSION_FILE_TYPE = 1;
 const WAITING_FOR_APPROVAL_STATUS = 0;
 const APPROVED_STATUS = 1;
 const REJECTED_STATUS = 2;
@@ -53,8 +55,14 @@ export function Dashboard() {
   const [savedIsStudent, setSavedIsStudent] = useState(false);
   const [savingParticipant, setSavingParticipant] = useState(false);
   const [saveParticipantError, setSaveParticipantError] = useState("");
+  const [uploadingStudentProof, setUploadingStudentProof] = useState(false);
+  const [studentUploadError, setStudentUploadError] = useState("");
   const [willPresent, setWillPresent] = useState(false);
+  const [presentationFile, setPresentationFile] = useState<File | null>(null);
+  const [savingSubmission, setSavingSubmission] = useState(false);
+  const [saveSubmissionError, setSaveSubmissionError] = useState("");
   const [submission, setSubmission] = useState({
+    submissionId: "",
     title: "",
     abstract: "",
     keywords: "",
@@ -89,6 +97,10 @@ export function Dashboard() {
     setIsStudent(participant.isStudent);
     setSavedRegistrationType(participant.registrationType);
     setSavedIsStudent(participant.isStudent);
+    setWillPresent(
+      Boolean(participant.isPresenting) ||
+      participant.fileManagers.some((file) => normalizeFileType(file.fileType) === SUBMISSION_FILE_TYPE)
+    );
   };
 
   useEffect(() => {
@@ -130,6 +142,7 @@ export function Dashboard() {
             country: null,
             registrationType: null,
             isStudent: false,
+            isPresenting: false,
             fileManagers: [],
             userId: currentUser.id ?? 0,
             conferenceId: currentUser.conferenceId ?? 0
@@ -175,23 +188,104 @@ export function Dashboard() {
 
       const savedParticipant = await updateParticipant(payload);
 
-      if (
-        savedParticipant.isStudent &&
-        studentProofFile &&
-        !isStudentStatusLocked &&
-        savedParticipant.id > 0
-      ) {
-        await uploadParticipantFile(savedParticipant.id, STUDENT_VERIFICATION_FILE_TYPE, studentProofFile);
-      }
-
       const refreshedParticipant = await getParticipantByUserId(currentUser.id);
       applyParticipantState(refreshedParticipant);
-      setStudentProofFile(null);
       toast.success("Zmeny sú uložené v databáze");
     } catch (error) {
       setSaveParticipantError(error instanceof Error ? error.message : "Uloženie zlyhalo");
     } finally {
       setSavingParticipant(false);
+    }
+  };
+
+  const handleUploadStudentProof = async () => {
+    if (!participantDraft || !participantDraft.id || !currentUser?.id || !studentProofFile) {
+      setStudentUploadError("Vyberte súbor na odoslanie.");
+      return;
+    }
+
+    setUploadingStudentProof(true);
+    setStudentUploadError("");
+    try {
+      let payload = participantDraft;
+
+      if (!payload.conferenceId || payload.conferenceId === 0) {
+        const activeConferences = await getActiveConferences();
+        const activeConference = activeConferences[0];
+        if (!activeConference) {
+          throw new Error("Aktívna konferencia nebola nájdená.");
+        }
+        payload = { ...payload, conferenceId: activeConference.id, isStudent: true };
+      } else {
+        payload = { ...payload, isStudent: true };
+      }
+
+      const savedParticipant = await updateParticipant(payload);
+      await uploadParticipantFile(savedParticipant.id, STUDENT_VERIFICATION_FILE_TYPE, studentProofFile);
+      const refreshedParticipant = await getParticipantByUserId(currentUser.id);
+      applyParticipantState(refreshedParticipant);
+      setStudentProofFile(null);
+      toast.success("Doklad bol odoslaný na overenie.");
+    } catch (error) {
+      setStudentUploadError(error instanceof Error ? error.message : "Odoslanie dokladu zlyhalo");
+    } finally {
+      setUploadingStudentProof(false);
+    }
+  };
+
+  const handleSaveSubmission = async () => {
+    if (!participantDraft || !currentUser?.id) return;
+
+    setSavingSubmission(true);
+    setSaveSubmissionError("");
+    try {
+      let payload: ParticipantPayload = {
+        ...participantDraft,
+        isPresenting: willPresent
+      };
+
+      if (!payload.conferenceId || payload.conferenceId === 0) {
+        const activeConferences = await getActiveConferences();
+        const activeConference = activeConferences[0];
+        if (!activeConference) {
+          throw new Error("Aktívna konferencia nebola nájdená.");
+        }
+        payload = { ...payload, conferenceId: activeConference.id };
+      }
+
+      await updateParticipant(payload);
+      const refreshedParticipant = await getParticipantByUserId(currentUser.id);
+      applyParticipantState(refreshedParticipant);
+      toast.success("Zmeny v príspevku boli uložené.");
+    } catch (error) {
+      setSaveSubmissionError(error instanceof Error ? error.message : "Uloženie príspevku zlyhalo");
+    } finally {
+      setSavingSubmission(false);
+    }
+  };
+
+  const handleUploadSubmissionFile = async () => {
+    if (!participantDraft?.id || !currentUser?.id || !presentationFile) {
+      setSaveSubmissionError("Vyberte súbor na odoslanie.");
+      return;
+    }
+
+    setSavingSubmission(true);
+    setSaveSubmissionError("");
+    try {
+      const savedParticipant = await updateParticipant({
+        ...participantDraft,
+        isPresenting: true
+      });
+      await uploadParticipantFile(savedParticipant.id, SUBMISSION_FILE_TYPE, presentationFile);
+      const refreshedParticipant = await getParticipantByUserId(currentUser.id);
+      applyParticipantState(refreshedParticipant);
+      setPresentationFile(null);
+      toast.success("Prezentácia bola odoslaná na overenie.");
+    } catch (error) {
+      setSaveSubmissionError(error instanceof Error ? error.message : "Odoslanie prezentácie zlyhalo");
+    } finally {
+      setSavingSubmission(false);
     }
   };
 
@@ -204,8 +298,8 @@ export function Dashboard() {
           ? 2
           : null;
 
-    updateDraft({ registrationType, isStudent });
-  }, [participationType, isStudent, studentProofFile]);
+    updateDraft({ registrationType, isStudent, isPresenting: willPresent });
+  }, [participationType, isStudent, willPresent]);
 
   const accommodationOptions = [
     { id: 1, name: "Hotel Devín - Jednolôžková", price: 85 },
@@ -260,9 +354,10 @@ export function Dashboard() {
         ? "Účastník bez príspevku"
         : "Nezvolený";
 
-  const studentVerificationFile = participantDraft?.fileManagers?.find(
-    (file) => normalizeFileType(file.fileType) === STUDENT_VERIFICATION_FILE_TYPE
-  );
+  const studentVerificationFiles = (participantDraft?.fileManagers ?? [])
+    .filter((file) => normalizeFileType(file.fileType) === STUDENT_VERIFICATION_FILE_TYPE)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const studentVerificationFile = studentVerificationFiles[0] ?? null;
   const studentVerificationStatus = studentVerificationFile
     ? normalizeFileStatus(studentVerificationFile.fileStatus)
     : null;
@@ -280,12 +375,38 @@ export function Dashboard() {
     if (studentVerificationStatus === REJECTED_STATUS) return "Zamietnutý, pošlite iné potvrdenie";
     return "Zvolený, neschválený";
   })();
+  const studentVerificationFileName = studentVerificationFile
+    ? studentVerificationFile.originalFileName || studentVerificationFile.fileName
+    : "";
+
+  const submissionFiles = (participantDraft?.fileManagers ?? [])
+    .filter((file) => normalizeFileType(file.fileType) === SUBMISSION_FILE_TYPE)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const latestSubmissionFile = submissionFiles[0] ?? null;
+  const latestSubmissionFileStatus = latestSubmissionFile
+    ? normalizeFileStatus(latestSubmissionFile.fileStatus)
+    : null;
+  const isSubmissionStatusLocked = Boolean(
+    latestSubmissionFile && latestSubmissionFileStatus !== REJECTED_STATUS
+  );
+  const latestSubmissionFileName = latestSubmissionFile
+    ? latestSubmissionFile.originalFileName || latestSubmissionFile.fileName
+    : "";
+  const submissionStatusLabel = (() => {
+    if (!willPresent && !latestSubmissionFile) return "Nie";
+    if (!latestSubmissionFile) return "Zvolený, neposlaný";
+    if (latestSubmissionFileStatus === WAITING_FOR_APPROVAL_STATUS) return "Čaká na schválenie";
+    if (latestSubmissionFileStatus === APPROVED_STATUS) return "Schválené";
+    if (latestSubmissionFileStatus === REJECTED_STATUS) return "Zamietnutý";
+    return "Zvolený, neposlaný";
+  })();
+  const getFileViewUrl = (fileManagerId: number) => `${BASE_URL}/api/file-manager/view/${fileManagerId}`;
+  const getFileDownloadUrl = (fileManagerId: number) => `${BASE_URL}/api/file-manager/download/${fileManagerId}`;
 
   const hasParticipationChanges = Boolean(
     participantDraft &&
       (participantDraft.registrationType !== savedRegistrationType ||
-        participantDraft.isStudent !== savedIsStudent ||
-        (participantDraft.isStudent && !isStudentStatusLocked && Boolean(studentProofFile)))
+        participantDraft.isStudent !== savedIsStudent)
   );
 
   if (!currentUser) return null;
@@ -298,7 +419,7 @@ export function Dashboard() {
           <p className="text-gray-600 mt-2">Správa vašej účasti na konferencii</p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-gray-600">Účasť</CardTitle>
@@ -314,6 +435,15 @@ export function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-base font-semibold">{studentStatusLabel}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600">Príspevok</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-base font-semibold">{submissionStatusLabel}</div>
             </CardContent>
           </Card>
         </div>
@@ -355,7 +485,11 @@ export function Dashboard() {
                     htmlFor="participantWithSubmission"
                     className="flex items-center space-x-3 p-4 border rounded-lg hover:bg-gray-50 cursor-pointer"
                   >
-                    <RadioGroupItem value="participantWithSubmission" id="participantWithSubmission" />
+                    <RadioGroupItem
+                      value="participantWithSubmission"
+                      id="participantWithSubmission"
+                      className="size-5 border-2 border-gray-500 data-[state=checked]:border-black"
+                    />
                     <div className="flex-1">
                       <div className="font-semibold">
                         Účastník s príspevkom
@@ -369,7 +503,11 @@ export function Dashboard() {
                     htmlFor="participantWithoutSubmission"
                     className="flex items-center space-x-3 p-4 border rounded-lg hover:bg-gray-50 cursor-pointer"
                   >
-                    <RadioGroupItem value="participantWithoutSubmission" id="participantWithoutSubmission" />
+                    <RadioGroupItem
+                      value="participantWithoutSubmission"
+                      id="participantWithoutSubmission"
+                      className="size-5 border-2 border-gray-500 data-[state=checked]:border-black"
+                    />
                     <div className="flex-1">
                       <div className="font-semibold">
                         Účastník bez príspevku
@@ -382,48 +520,106 @@ export function Dashboard() {
 
                 {participationType && (
                   <>
-                    <div className="space-y-3 p-4 border rounded-lg bg-gray-50">
+                    <div className="border-t border-gray-200" />
+
+                    <div className="space-y-3">
                       <Label className="text-base font-semibold">Študentský status</Label>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="studentStatusDashboard"
-                          checked={isStudent}
-                          disabled={isStudentStatusLocked}
-                          onCheckedChange={(checked) => {
-                            const nextIsStudent = checked as boolean;
-                            setIsStudent(nextIsStudent);
-                            if (!nextIsStudent) {
-                              setStudentProofFile(null);
-                            }
-                          }}
-                        />
-                        <Label htmlFor="studentStatusDashboard" className="cursor-pointer">
-                          Som študent
-                        </Label>
+                      <div className="space-y-3 rounded-lg border bg-gray-50 p-4">
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="studentStatusDashboard"
+                            checked={isStudent}
+                            disabled={isStudentStatusLocked}
+                            onCheckedChange={(checked) => {
+                              const nextIsStudent = checked as boolean;
+                              setIsStudent(nextIsStudent);
+                              if (!nextIsStudent) {
+                                setStudentProofFile(null);
+                              }
+                            }}
+                          />
+                          <Label htmlFor="studentStatusDashboard" className="cursor-pointer">
+                            Som študent
+                          </Label>
+                        </div>
+                        <p className="text-sm text-gray-600">Študentská zľava 50% (50 € namiesto 100 €)</p>
+
+                        {isStudentStatusLocked && studentVerificationStatus === WAITING_FOR_APPROVAL_STATUS && (
+                          <div className="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                            <Clock className="mt-0.5 h-4 w-4 shrink-0" />
+                            <p>Váš dokument čaká na schválenie administrátorom. Zmenu nie je možné vykonať.</p>
+                          </div>
+                        )}
+
+                        {isStudentStatusLocked && studentVerificationStatus === APPROVED_STATUS && (
+                          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                            Študentský status bol schválený.
+                          </div>
+                        )}
+
+                        {studentVerificationFile && (
+                          <div className="space-y-3 rounded-lg border bg-white p-4">
+                            <div className="space-y-1">
+                              <Label>Aktuálny doklad</Label>
+                              <p className="text-sm break-all text-gray-700">{studentVerificationFileName}</p>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => window.open(getFileViewUrl(studentVerificationFile.id), "_blank", "noopener,noreferrer")}
+                              >
+                                Otvoriť
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => {
+                                  const link = document.createElement("a");
+                                  link.href = getFileDownloadUrl(studentVerificationFile.id);
+                                  link.download = studentVerificationFileName;
+                                  document.body.appendChild(link);
+                                  link.click();
+                                  link.remove();
+                                }}
+                              >
+                                Stiahnuť
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+
+                        {isStudent && !isStudentStatusLocked && (
+                          <div className="space-y-3 rounded-lg border bg-white p-4">
+                            <div className="space-y-1">
+                              <Label htmlFor="studentProofDashboard">Overenie študentského statusu</Label>
+                              <p className="text-sm text-gray-500">
+                                Nahrajte potvrdenie o štúdiu. Ak ho teraz nemáte, môžete ho doplniť neskôr.
+                              </p>
+                            </div>
+                            <Input
+                              id="studentProofDashboard"
+                              type="file"
+                              accept=".pdf,.jpg,.jpeg,.png"
+                              onChange={(e) => setStudentProofFile(e.target.files?.[0] || null)}
+                            />
+                            <Button
+                              type="button"
+                              className="w-full sm:w-auto"
+                              onClick={handleUploadStudentProof}
+                              disabled={!studentProofFile || uploadingStudentProof}
+                            >
+                              {uploadingStudentProof ? "Odosielam..." : "Odoslať na overenie"}
+                            </Button>
+                          </div>
+                        )}
                       </div>
 
-                      {isStudentStatusLocked && studentVerificationStatus === WAITING_FOR_APPROVAL_STATUS && (
-                        <p className="text-sm text-gray-600">
-                          Študentský status čaká na schválenie. Zmenu momentálne nie je možné vykonať.
-                        </p>
-                      )}
-
-                      {isStudentStatusLocked && studentVerificationStatus === APPROVED_STATUS && (
-                        <p className="text-sm text-gray-600">
-                          Študentský status bol schválený. Zmenu nie je možné vykonať.
-                        </p>
-                      )}
-
-                      {isStudent && !isStudentStatusLocked && (
-                        <div className="space-y-2">
-                          <Label htmlFor="studentProofDashboard">Nahrať overenie študentského statusu</Label>
-                          <Input
-                            id="studentProofDashboard"
-                            type="file"
-                            accept=".pdf,.jpg,.jpeg,.png"
-                            onChange={(e) => setStudentProofFile(e.target.files?.[0] || null)}
-                          />
-                        </div>
+                      {studentUploadError && (
+                        <Alert variant="destructive">
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertDescription>{studentUploadError}</AlertDescription>
+                        </Alert>
                       )}
 
                       {saveParticipantError && (
@@ -432,12 +628,14 @@ export function Dashboard() {
                           <AlertDescription>{saveParticipantError}</AlertDescription>
                         </Alert>
                       )}
-
                     </div>
 
-                    <div className="flex justify-end">
+                    <div className="border-t border-gray-200" />
+
+                    <div className="flex justify-center">
                       <Button
                         type="button"
+                        className="w-full"
                         onClick={handleSaveParticipation}
                         disabled={savingParticipant || !hasParticipationChanges}
                       >
@@ -470,6 +668,16 @@ export function Dashboard() {
                   <>
                     <div className="space-y-4">
                       <div className="space-y-2">
+                        <Label htmlFor="submissionId">ID príspevku *</Label>
+                        <Input
+                          id="submissionId"
+                          value={submission.submissionId}
+                          onChange={(e) => setSubmission({ ...submission, submissionId: e.target.value })}
+                          placeholder="ID vášho príspevku"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
                         <Label htmlFor="title">Názov príspevku *</Label>
                         <Input
                           id="title"
@@ -479,37 +687,113 @@ export function Dashboard() {
                         />
                       </div>
 
-                      <div className="space-y-2">
-                        <Label htmlFor="abstract">Abstrakt *</Label>
-                        <Textarea
-                          id="abstract"
-                          value={submission.abstract}
-                          onChange={(e) => setSubmission({...submission, abstract: e.target.value})}
-                          placeholder="Stručný popis vášho príspevku (max 300 slov)"
-                          rows={6}
-                        />
+                      <div className="space-y-3 rounded-lg border bg-gray-50 p-4">
+                        <div className="flex items-center space-x-2">
+                          <Checkbox 
+                            id="willPresent" 
+                            checked={willPresent}
+                            disabled={isSubmissionStatusLocked}
+                            onCheckedChange={(checked) => {
+                              const nextValue = checked as boolean;
+                              setWillPresent(nextValue);
+                              if (!nextValue) {
+                                setPresentationFile(null);
+                              }
+                            }}
+                          />
+                          <Label htmlFor="willPresent">Som prezentér</Label>
+                        </div>
+
+                        {isSubmissionStatusLocked && latestSubmissionFileStatus === WAITING_FOR_APPROVAL_STATUS && (
+                          <div className="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                            <Clock className="mt-0.5 h-4 w-4 shrink-0" />
+                            <p>Vaša prezentácia čaká na schválenie administrátorom. Zmenu nie je možné vykonať.</p>
+                          </div>
+                        )}
+
+                        {isSubmissionStatusLocked && latestSubmissionFileStatus === APPROVED_STATUS && (
+                          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                            Prezentácia bola schválená.
+                          </div>
+                        )}
+
+                        {latestSubmissionFileStatus === REJECTED_STATUS && (
+                          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                            Prezentácia bola zamietnutá. Nahrajte novú verziu.
+                          </div>
+                        )}
+
+                        {latestSubmissionFile && (
+                          <div className="space-y-3 rounded-lg border bg-white p-4">
+                            <div className="space-y-1">
+                              <Label>Aktuálna prezentácia</Label>
+                              <p className="text-sm break-all text-gray-700">{latestSubmissionFileName}</p>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => window.open(getFileViewUrl(latestSubmissionFile.id), "_blank", "noopener,noreferrer")}
+                              >
+                                Otvoriť
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => {
+                                  const link = document.createElement("a");
+                                  link.href = getFileDownloadUrl(latestSubmissionFile.id);
+                                  link.download = latestSubmissionFileName;
+                                  document.body.appendChild(link);
+                                  link.click();
+                                  link.remove();
+                                }}
+                              >
+                                Stiahnuť
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+
+                        {willPresent && !isSubmissionStatusLocked && (
+                          <div className="space-y-3 rounded-lg border bg-white p-4">
+                            <div className="space-y-1">
+                              <Label htmlFor="presentationUpload">Prezentácia</Label>
+                              <p className="text-sm text-gray-500">
+                                Nahrajte prezentáciu. Ak ju ešte nemáte pripravenú, môžete ju doplniť neskôr.
+                              </p>
+                            </div>
+                            <Input
+                              id="presentationUpload"
+                              type="file"
+                              accept=".pdf,.ppt,.pptx"
+                              onChange={(e) => setPresentationFile(e.target.files?.[0] || null)}
+                            />
+                            {presentationFile && (
+                              <p className="text-sm text-gray-600">{presentationFile.name}</p>
+                            )}
+                            <Button
+                              type="button"
+                              className="w-full sm:w-auto"
+                              onClick={handleUploadSubmissionFile}
+                              disabled={!presentationFile || savingSubmission}
+                            >
+                              {savingSubmission ? "Odosielam..." : "Odoslať na overenie"}
+                            </Button>
+                          </div>
+                        )}
                       </div>
 
-                      <div className="space-y-2">
-                        <Label htmlFor="keywords">Kľúčové slová</Label>
-                        <Input
-                          id="keywords"
-                          value={submission.keywords}
-                          onChange={(e) => setSubmission({...submission, keywords: e.target.value})}
-                          placeholder="AI, Machine Learning, Deep Learning"
-                        />
-                      </div>
+                      {saveSubmissionError && (
+                        <Alert variant="destructive">
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertDescription>{saveSubmissionError}</AlertDescription>
+                        </Alert>
+                      )}
 
-                      <div className="flex items-center space-x-2">
-                        <Checkbox 
-                          id="willPresent" 
-                          checked={willPresent}
-                          onCheckedChange={(checked) => setWillPresent(checked as boolean)}
-                        />
-                        <Label htmlFor="willPresent">Som prezentér príspevku</Label>
-                      </div>
-
-                      <Button className="w-full">Uložiť príspevok</Button>
+                      <Button type="button" className="w-full" onClick={handleSaveSubmission} disabled={savingSubmission}>
+                        Uložiť príspevok
+                      </Button>
                     </div>
                   </>
                 ) : (

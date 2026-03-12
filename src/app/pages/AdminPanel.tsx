@@ -60,6 +60,7 @@ type Participant = {
   lastName: string;
   registrationType: number | null;
   isStudent: boolean;
+  isPresenting?: boolean | null;
   fileManagers: FileManagerPayload[];
   email: string;
   phone: string;
@@ -71,6 +72,7 @@ type Participant = {
 };
 
 const STUDENT_VERIFICATION_FILE_TYPE = 0;
+const SUBMISSION_FILE_TYPE = 1;
 const WAITING_FOR_APPROVAL_STATUS = 0;
 const APPROVED_STATUS = 1;
 const REJECTED_STATUS = 2;
@@ -104,6 +106,12 @@ const getRegistrationTypeLabel = (registrationType: number | null) => {
   return "Nezvolený";
 };
 
+const getLatestSubmissionFile = (participant: Participant) => {
+  return participant.fileManagers
+    .filter((file) => normalizeFileType(file.fileType) === SUBMISSION_FILE_TYPE)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0] ?? null;
+};
+
 const getStudentLabel = (participant: Participant) => {
   if (!participant.isStudent) return "Nie";
   const latestStudentFile = getLatestStudentVerificationFile(participant);
@@ -116,6 +124,18 @@ const getStudentLabel = (participant: Participant) => {
   return "Zvolený, neschválený";
 };
 
+const getSubmissionLabel = (participant: Participant) => {
+  if (!participant.isPresenting && participant.registrationType !== 1) return "Nie";
+  const latestSubmissionFile = getLatestSubmissionFile(participant);
+  if (!latestSubmissionFile) return "Zvolený, neposlaný";
+
+  const latestSubmissionFileStatus = normalizeFileStatus(latestSubmissionFile.fileStatus);
+  if (latestSubmissionFileStatus === WAITING_FOR_APPROVAL_STATUS) return "Čaká na schválenie";
+  if (latestSubmissionFileStatus === APPROVED_STATUS) return "Schválené";
+  if (latestSubmissionFileStatus === REJECTED_STATUS) return "Zamietnutý";
+  return "Zvolený, neposlaný";
+};
+
 const getStudentStatusBadgeClass = (participant: Participant) => {
   const label = getStudentLabel(participant);
   if (label === "Schválené") return "bg-green-100 text-green-800 border-green-200";
@@ -125,9 +145,23 @@ const getStudentStatusBadgeClass = (participant: Participant) => {
   return "bg-gray-100 text-gray-700 border-gray-200";
 };
 
+const getSubmissionStatusBadgeClass = (participant: Participant) => {
+  const label = getSubmissionLabel(participant);
+  if (label === "Schválené") return "bg-green-100 text-green-800 border-green-200";
+  if (label === "Čaká na schválenie") return "bg-yellow-100 text-yellow-800 border-yellow-200";
+  if (label === "Zamietnutý") return "bg-red-100 text-red-800 border-red-200";
+  if (label === "Zvolený, neposlaný") return "bg-orange-100 text-orange-800 border-orange-200";
+  return "bg-gray-100 text-gray-700 border-gray-200";
+};
+
 const getStudentFileHistory = (participant: Participant) =>
   participant.fileManagers
     .filter((file) => normalizeFileType(file.fileType) === STUDENT_VERIFICATION_FILE_TYPE)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+const getSubmissionFileHistory = (participant: Participant) =>
+  participant.fileManagers
+    .filter((file) => normalizeFileType(file.fileType) === SUBMISSION_FILE_TYPE)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
 const getFileStatusLabel = (file: FileManagerPayload) => {
@@ -211,6 +245,9 @@ export function Admin() {
   const [studentFileDialog, setStudentFileDialog] = useState(false);
   const [studentFileParticipant, setStudentFileParticipant] = useState<Participant | null>(null);
   const [studentStatusActionLoading, setStudentStatusActionLoading] = useState<"approve" | "reject" | null>(null);
+  const [submissionFileDialog, setSubmissionFileDialog] = useState(false);
+  const [submissionFileParticipant, setSubmissionFileParticipant] = useState<Participant | null>(null);
+  const [submissionStatusActionLoading, setSubmissionStatusActionLoading] = useState<"approve" | "reject" | null>(null);
   const [deletePartDialog, setDeletePartDialog] = useState<number | null>(null);
   const [newInvoiceDialog, setNewInvoiceDialog] = useState(false);
   const [editInvoiceDialog, setEditInvoiceDialog] = useState(false);
@@ -277,6 +314,7 @@ export function Admin() {
               lastName: participant.lastName ?? "",
               registrationType: participant.registrationType,
               isStudent: participant.isStudent,
+              isPresenting: participant.isPresenting ?? false,
               fileManagers: participant.fileManagers ?? [],
               email: participant.user?.email ?? "",
               phone: participant.phone ?? "",
@@ -426,6 +464,12 @@ export function Admin() {
     setStudentFileDialog(true);
   };
 
+  const openSubmissionStatusDialog = (participant: Participant) => {
+    if (participant.registrationType !== 1) return;
+    setSubmissionFileParticipant(participant);
+    setSubmissionFileDialog(true);
+  };
+
   const handleStudentStatusAction = async (action: "approve" | "reject", fileManagerId: number) => {
     if (!currentUser?.email) return;
     setStudentStatusActionLoading(action);
@@ -448,6 +492,31 @@ export function Admin() {
       toast.error(message);
     } finally {
       setStudentStatusActionLoading(null);
+    }
+  };
+
+  const handleSubmissionStatusAction = async (action: "approve" | "reject", fileManagerId: number) => {
+    if (!currentUser?.email) return;
+    setSubmissionStatusActionLoading(action);
+    try {
+      if (action === "approve") {
+        await approveFileManager(fileManagerId, currentUser.email);
+        toast.success("Príspevok bol schválený.");
+      } else {
+        await rejectFileManager(fileManagerId, currentUser.email);
+        toast.success("Príspevok bol zamietnutý.");
+      }
+
+      const refreshedParticipants = await loadParticipants();
+      if (submissionFileParticipant) {
+        const refreshed = refreshedParticipants.find((p) => p.id === submissionFileParticipant.id) ?? null;
+        setSubmissionFileParticipant(refreshed);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Operácia zlyhala";
+      toast.error(message);
+    } finally {
+      setSubmissionStatusActionLoading(null);
     }
   };
 
@@ -687,6 +756,7 @@ export function Admin() {
                         <TableHead>Meno</TableHead>
                         <TableHead>Typ registrácie</TableHead>
                         <TableHead>Študentský status</TableHead>
+                        <TableHead>Príspevok</TableHead>
                         <TableHead className="text-right">Akcie</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -708,6 +778,15 @@ export function Admin() {
                               onClick={() => openStudentStatusDialog(participant)}
                             >
                               {getStudentLabel(participant)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="outline"
+                              className={`${getSubmissionStatusBadgeClass(participant)} ${participant.registrationType === 1 ? "cursor-pointer hover:opacity-80" : ""}`}
+                              onClick={() => openSubmissionStatusDialog(participant)}
+                            >
+                              {getSubmissionLabel(participant)}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right">
@@ -781,6 +860,17 @@ export function Admin() {
                           onClick={() => openStudentStatusDialog(participant)}
                         >
                           {getStudentLabel(participant)}
+                        </Badge>
+                      </div>
+
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600">Príspevok:</span>
+                        <Badge
+                          variant="outline"
+                          className={`${getSubmissionStatusBadgeClass(participant)} ${participant.registrationType === 1 ? "cursor-pointer hover:opacity-80" : ""}`}
+                          onClick={() => openSubmissionStatusDialog(participant)}
+                        >
+                          {getSubmissionLabel(participant)}
                         </Badge>
                       </div>
                     </div>
@@ -1194,6 +1284,187 @@ export function Admin() {
                                           ) : (
                                             <div className="h-16 flex items-center justify-center text-[11px] text-gray-600">
                                               PDF
+                                            </div>
+                                          )}
+                                        </button>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell>
+                                      <Badge variant="outline" className={getFileStatusBadgeClass(file)}>
+                                        {getFileStatusLabel(file)}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                      <div className="flex flex-wrap justify-end gap-2">
+                                        <Button
+                                          type="button"
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => {
+                                            const link = document.createElement("a");
+                                            link.href = fileHistoryDownloadUrl;
+                                            link.download = fileHistoryName;
+                                            document.body.appendChild(link);
+                                            link.click();
+                                            link.remove();
+                                          }}
+                                        >
+                                          Stiahnuť
+                                        </Button>
+                                      </div>
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                              {historyWithoutLatest.length === 0 && (
+                                <TableRow>
+                                  <TableCell colSpan={3} className="text-sm text-gray-600">
+                                    Bez starších záznamov.
+                                  </TableCell>
+                                </TableRow>
+                              )}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={submissionFileDialog} onOpenChange={setSubmissionFileDialog}>
+          <DialogContent className="sm:max-w-3xl max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Príspevok</DialogTitle>
+              <DialogDescription>Stiahnutie a správa nahraného príspevku alebo prezentácie</DialogDescription>
+            </DialogHeader>
+            {submissionFileParticipant && (
+              <div className="space-y-4 py-2">
+                <div className="space-y-1">
+                  <p className="text-sm text-gray-600">Účastník</p>
+                  <p className="font-medium break-words">
+                    {submissionFileParticipant.firstName} {submissionFileParticipant.lastName}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm text-gray-600">Status</p>
+                  <Badge variant="outline" className={getSubmissionStatusBadgeClass(submissionFileParticipant)}>
+                    {getSubmissionLabel(submissionFileParticipant)}
+                  </Badge>
+                </div>
+                {(() => {
+                  const history = getSubmissionFileHistory(submissionFileParticipant);
+                  const latestSubmissionFile = history[0];
+                  const historyWithoutLatest = history.slice(1);
+                  if (!latestSubmissionFile) {
+                    return (
+                      <p className="text-sm text-gray-600">
+                        Pre tohto účastníka zatiaľ nie je nahratý príspevok ani prezentácia.
+                      </p>
+                    );
+                  }
+
+                  const fileViewUrl = getFileViewUrl(latestSubmissionFile.id);
+                  const fileDownloadUrl = getFileDownloadUrl(latestSubmissionFile.id);
+                  const fileName = latestSubmissionFile.originalFileName || latestSubmissionFile.fileName;
+                  const imageFile = isImageFile(fileName);
+                  return (
+                    <div className="space-y-3">
+                      <div className="space-y-1">
+                        <p className="text-sm text-gray-600">Aktuálny súbor</p>
+                        <p className="font-medium break-all">{fileName}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => window.open(fileViewUrl, "_blank", "noopener,noreferrer")}
+                        className="w-full sm:w-64 border rounded-lg bg-gray-50 overflow-hidden text-left"
+                        title="Otvoriť náhľad"
+                      >
+                        {imageFile ? (
+                          <img
+                            src={fileViewUrl}
+                            alt={fileName}
+                            className="w-full h-32 object-cover"
+                          />
+                        ) : (
+                          <div className="h-32 flex items-center justify-center text-sm text-gray-600">
+                            Náhľad súboru
+                          </div>
+                        )}
+                      </button>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            const link = document.createElement("a");
+                            link.href = fileDownloadUrl;
+                            link.download = fileName;
+                            document.body.appendChild(link);
+                            link.click();
+                            link.remove();
+                          }}
+                          disabled={!latestSubmissionFile.id}
+                        >
+                          Stiahnuť
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={() => handleSubmissionStatusAction("approve", latestSubmissionFile.id)}
+                          disabled={!latestSubmissionFile.id || submissionStatusActionLoading !== null}
+                        >
+                          Schváliť
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          onClick={() => handleSubmissionStatusAction("reject", latestSubmissionFile.id)}
+                          disabled={!latestSubmissionFile.id || submissionStatusActionLoading !== null}
+                        >
+                          Zamietnuť
+                        </Button>
+                      </div>
+
+                      <div className="pt-2">
+                        <p className="text-sm text-gray-600 mb-2">História súborov</p>
+                        <div className="border rounded-lg overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Názov</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead className="text-right">Akcie</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {historyWithoutLatest.map((file) => {
+                                const fileHistoryViewUrl = getFileViewUrl(file.id);
+                                const fileHistoryDownloadUrl = getFileDownloadUrl(file.id);
+                                const fileHistoryName = file.originalFileName || file.fileName;
+                                const historyImageFile = isImageFile(fileHistoryName);
+                                return (
+                                  <TableRow key={file.id}>
+                                    <TableCell className="max-w-[320px] whitespace-normal break-all">
+                                      <div className="space-y-2">
+                                        <p>{fileHistoryName}</p>
+                                        <button
+                                          type="button"
+                                          onClick={() => window.open(fileHistoryViewUrl, "_blank", "noopener,noreferrer")}
+                                          className="w-24 border rounded bg-gray-50 overflow-hidden text-left"
+                                          title="Otvoriť náhľad"
+                                        >
+                                          {historyImageFile ? (
+                                            <img
+                                              src={fileHistoryViewUrl}
+                                              alt={fileHistoryName}
+                                              className="w-full h-16 object-cover"
+                                            />
+                                          ) : (
+                                            <div className="h-16 flex items-center justify-center text-[11px] text-gray-600">
+                                              Súbor
                                             </div>
                                           )}
                                         </button>

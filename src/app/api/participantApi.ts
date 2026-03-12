@@ -25,6 +25,7 @@ export type ParticipantPayload = {
   country?: string | null;
   registrationType: number | null;
   isStudent: boolean;
+  isPresenting?: boolean | null;
   fileManagers: FileManagerPayload[];
   userId: number;
   conferenceId: number;
