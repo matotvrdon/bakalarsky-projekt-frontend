@@ -1,133 +1,342 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card.tsx";
+import { AlertCircle, CheckCircle2, User } from "lucide-react";
+import { Alert, AlertDescription } from "../components/ui/alert.tsx";
 import { Button } from "../components/ui/button.tsx";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card.tsx";
 import { Input } from "../components/ui/input.tsx";
 import { Label } from "../components/ui/label.tsx";
-import { Alert, AlertDescription } from "../components/ui/alert.tsx";
-import { CheckCircle2, AlertCircle, Mail, User } from "lucide-react";
 import { getActiveConferences } from "../api/conferenceApi.ts";
-import { registerSimple } from "../api/authApi.ts";
+import {
+  AuthApiError,
+  registerAccount,
+  registerBasic,
+  type RegisterAccountResponse,
+  type RegisterBasicResponse,
+} from "../api/authApi.ts";
+
+type RegistrationStep = "details" | "account" | "complete";
+type DetailsField = "firstName" | "lastName" | "phone" | "affiliation" | "country" | "conferenceId";
+type AccountField = "email" | "password" | "confirmPassword" | "participantId";
+type FieldErrors = Partial<Record<DetailsField | AccountField, string>>;
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PASSWORD_RE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+
+const normalizeFieldKey = (field: string) => {
+  if (!field) return field;
+  return field.charAt(0).toLowerCase() + field.slice(1);
+};
 
 export function Registration() {
   const navigate = useNavigate();
+  const [step, setStep] = useState<RegistrationStep>("details");
+  const [basicLoading, setBasicLoading] = useState(false);
+  const [accountLoading, setAccountLoading] = useState(false);
+  const [detailsError, setDetailsError] = useState("");
+  const [accountError, setAccountError] = useState("");
+  const [detailsFieldErrors, setDetailsFieldErrors] = useState<FieldErrors>({});
+  const [accountFieldErrors, setAccountFieldErrors] = useState<FieldErrors>({});
+  const [basicResult, setBasicResult] = useState<RegisterBasicResponse | null>(null);
+  const [accountResult, setAccountResult] = useState<RegisterAccountResponse | null>(null);
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
-    email: "",
     phone: "",
     affiliation: "",
     country: "Slovensko",
+    email: "",
+    password: "",
+    confirmPassword: "",
   });
-  const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [error, setError] = useState("");
-  const [registrationResult, setRegistrationResult] = useState<{
-    email: string;
-    message: string;
-    messageStatus: 0 | 1;
-  } | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-
-    try {
-      const conferences = await getActiveConferences();
-      const activeConference = conferences[0];
-      if (!activeConference) {
-        throw new Error("Aktívna konferencia nebola nájdená.");
-      }
-
-      const response = await registerSimple({
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        email: formData.email,
-        phone: formData.phone || undefined,
-        affiliation: formData.affiliation || undefined,
-        country: formData.country || undefined,
-        conferenceId: activeConference.id
-      });
-
-      const messageStatus =
-        "messageStatus" in response
-          ? response.messageStatus
-          : ("messageStutus" in response ? (response as any).messageStutus : 1);
-
-      if (messageStatus === 0) {
-        setRegistrationResult(null);
-        setError(response.message);
-        setSuccess(false);
-        return;
-      }
-
-      setRegistrationResult({
-        email: response.email,
-        message: response.message,
-        messageStatus: 1,
-      });
-      setSuccess(true);
-    } catch (error) {
-      console.error("Registration error:", error);
-      const rawMessage = error instanceof Error ? error.message : "Registrácia zlyhala";
-      let resolvedMessage = rawMessage;
-      try {
-        const parsed = JSON.parse(rawMessage);
-        if (parsed && typeof parsed.message === "string") {
-          resolvedMessage = parsed.message;
-        }
-      } catch { }
-      setError(resolvedMessage);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleChange = (field: string, value: string) => {
+  const handleChange = (field: keyof typeof formData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  if (success && registrationResult) {
+  const applyApiError = (
+    error: unknown,
+    allowedFields: Array<DetailsField | AccountField>,
+    setFieldErrors: (errors: FieldErrors) => void,
+    setGeneralError: (message: string) => void,
+  ) => {
+    if (!(error instanceof AuthApiError)) {
+      setGeneralError(error instanceof Error ? error.message : "Operácia zlyhala");
+      return;
+    }
+
+    const nextErrors: FieldErrors = {};
+
+    if (error.validationErrors) {
+      Object.entries(error.validationErrors).forEach(([key, messages]) => {
+        const normalizedKey = normalizeFieldKey(key) as DetailsField | AccountField;
+        if (allowedFields.includes(normalizedKey) && messages.length > 0) {
+          nextErrors[normalizedKey] = messages[0];
+        }
+      });
+    }
+
+    if (error.field) {
+      const normalizedField = normalizeFieldKey(error.field) as DetailsField | AccountField;
+      if (allowedFields.includes(normalizedField) && !nextErrors[normalizedField]) {
+        nextErrors[normalizedField] = error.message;
+      }
+    }
+
+    setFieldErrors(nextErrors);
+
+    const hasFieldErrors = Object.keys(nextErrors).length > 0;
+    if (!hasFieldErrors) {
+      setGeneralError(error.message);
+    }
+  };
+
+  const handleDetailsSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setDetailsError("");
+    setDetailsFieldErrors({});
+
+    const nextErrors: FieldErrors = {};
+    if (!formData.firstName.trim()) nextErrors.firstName = "Meno je povinné.";
+    if (!formData.lastName.trim()) nextErrors.lastName = "Priezvisko je povinné.";
+
+    if (Object.keys(nextErrors).length > 0) {
+      setDetailsFieldErrors(nextErrors);
+      return;
+    }
+
+    setBasicLoading(true);
+    try {
+      const conferences = await getActiveConferences();
+      const activeConference = conferences[0];
+
+      if (!activeConference) {
+        setDetailsFieldErrors({ conferenceId: "Aktívna konferencia nebola nájdená." });
+        return;
+      }
+
+      const response = await registerBasic({
+        firstName: formData.firstName.trim(),
+        lastName: formData.lastName.trim(),
+        phone: formData.phone.trim() || null,
+        affiliation: formData.affiliation.trim() || null,
+        country: formData.country.trim() || null,
+        conferenceId: activeConference.id,
+      });
+
+      setBasicResult(response);
+      setStep("account");
+    } catch (error) {
+      applyApiError(
+        error,
+        ["firstName", "lastName", "phone", "affiliation", "country", "conferenceId"],
+        setDetailsFieldErrors,
+        setDetailsError
+      );
+    } finally {
+      setBasicLoading(false);
+    }
+  };
+
+  const handleAccountSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAccountError("");
+    setAccountFieldErrors({});
+
+    const nextErrors: FieldErrors = {};
+    if (!basicResult?.participantId) nextErrors.participantId = "Participant ID nebol nájdený.";
+    if (!formData.email.trim()) nextErrors.email = "Email je povinný.";
+    else if (!EMAIL_RE.test(formData.email.trim())) nextErrors.email = "Zadajte platný email.";
+
+    if (!formData.password) nextErrors.password = "Heslo je povinné.";
+    else if (!PASSWORD_RE.test(formData.password)) {
+      nextErrors.password = "Heslo musí mať aspoň 8 znakov, veľké písmeno, malé písmeno a číslicu.";
+    }
+
+    if (!formData.confirmPassword) nextErrors.confirmPassword = "Potvrdenie hesla je povinné.";
+    else if (formData.confirmPassword !== formData.password) {
+      nextErrors.confirmPassword = "Potvrdenie hesla sa musí zhodovať s heslom.";
+    }
+
+    if (Object.keys(nextErrors).length > 0) {
+      setAccountFieldErrors(nextErrors);
+      return;
+    }
+
+    setAccountLoading(true);
+    try {
+      const response = await registerAccount({
+        participantId: basicResult!.participantId,
+        email: formData.email.trim(),
+        password: formData.password,
+        confirmPassword: formData.confirmPassword,
+      });
+
+      setAccountResult(response);
+      setStep("complete");
+    } catch (error) {
+      applyApiError(
+        error,
+        ["participantId", "email", "password", "confirmPassword"],
+        setAccountFieldErrors,
+        setAccountError
+      );
+    } finally {
+      setAccountLoading(false);
+    }
+  };
+
+  const renderFieldError = (message?: string) =>
+    message ? <p className="text-sm text-red-600">{message}</p> : null;
+
+  if (step === "complete" && accountResult) {
     return (
       <div className="min-h-[calc(100vh-4rem)] bg-gray-50 py-12 px-4">
         <div className="container mx-auto max-w-2xl">
           <Card>
-            <CardHeader className="text-center pb-8">
-              <div className="flex justify-center mb-4">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
-                  <CheckCircle2 className="w-10 h-10 text-green-600" />
+            <CardHeader className="pb-6 text-center">
+              <div className="mb-4 flex justify-center">
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
+                  <CheckCircle2 className="h-9 w-9 text-green-600" />
                 </div>
               </div>
-              <CardTitle className="text-2xl">Registrácia úspešná!</CardTitle>
+              <CardTitle className="text-3xl">Účet bol vytvorený</CardTitle>
+              <CardDescription className="text-base">
+                Registrácia aj vytvorenie účtu prebehli úspešne.
+              </CardDescription>
             </CardHeader>
-        <CardContent className="space-y-6">
-          {registrationResult?.message && (
-            <Alert className="bg-blue-50 border-blue-200">
-              <Mail className="h-4 w-4 text-blue-600" />
-              <AlertDescription className="text-blue-900">
-                {registrationResult.message} {registrationResult.email}
-              </AlertDescription>
-            </Alert>
-          )}
-          <div className="space-y-3">
-            <h4 className="font-semibold">Ďalšie kroky:</h4>
-                <ol className="list-decimal list-inside space-y-2 text-sm text-gray-600">
-                  <li>Prihláste sa pomocou emailu a hesla</li>
-                  <li>Vyplňte údaje o vašej účasti (typ účasti, ubytovanie, strava)</li>
-                  <li>Vygenerujte si faktúru</li>
-                  <li>Zaplaťte faktúru podľa pokynov</li>
-                </ol>
+            <CardContent className="space-y-6">
+              <Alert className="border-blue-200 bg-blue-50">
+                <AlertCircle className="h-4 w-4 text-blue-600" />
+                <AlertDescription className="text-blue-900">
+                  {accountResult.message} Prihláste sa emailom <strong>{accountResult.user.email}</strong>.
+                </AlertDescription>
+              </Alert>
+
+              <div className="rounded-xl border bg-gray-50 p-4">
+                <div className="mb-4 flex items-center gap-2">
+                  <User className="h-5 w-5" />
+                  <h3 className="text-lg font-semibold">Vaše údaje</h3>
+                </div>
+                <div className="grid grid-cols-[140px_1fr] gap-y-3 text-sm sm:grid-cols-[160px_1fr]">
+                  <span className="text-gray-600">Meno:</span>
+                  <span className="font-medium">{formData.firstName} {formData.lastName}</span>
+                  <span className="text-gray-600">Telefón:</span>
+                  <span className="font-medium">{formData.phone || "-"}</span>
+                  <span className="text-gray-600">Inštitúcia:</span>
+                  <span className="font-medium">{formData.affiliation || "-"}</span>
+                </div>
               </div>
 
-              <div className="flex gap-3">
-                <Button onClick={() => navigate("/login")} className="flex-1">
-                  Prihlásiť sa teraz
-                </Button>
-                <Button onClick={() => navigate("/")} variant="outline" className="flex-1">
-                  Späť na domov
-                </Button>
+              <Button className="w-full" size="lg" onClick={() => navigate("/login")}>
+                Prihlásiť sa
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  if (step === "account" && basicResult) {
+    return (
+      <div className="min-h-[calc(100vh-4rem)] bg-gray-50 py-12 px-4">
+        <div className="container mx-auto max-w-2xl">
+          <Card>
+            <CardHeader className="pb-6 text-center">
+              <div className="mb-4 flex justify-center">
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
+                  <CheckCircle2 className="h-9 w-9 text-green-600" />
+                </div>
               </div>
+              <CardTitle className="text-3xl">Základná registrácia dokončená!</CardTitle>
+              <CardDescription className="text-base">
+                Pokračujte vytvorením účtu
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {accountError && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{accountError}</AlertDescription>
+                </Alert>
+              )}
+
+              {accountFieldErrors.participantId && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{accountFieldErrors.participantId}</AlertDescription>
+                </Alert>
+              )}
+
+              <div className="rounded-xl border bg-gray-50 p-4">
+                <div className="mb-4 flex items-center gap-2">
+                  <User className="h-5 w-5" />
+                  <h3 className="text-lg font-semibold">Vaše údaje</h3>
+                </div>
+                <div className="grid grid-cols-[140px_1fr] gap-y-3 text-sm sm:grid-cols-[160px_1fr]">
+                  <span className="text-gray-600">Meno:</span>
+                  <span className="font-medium">{formData.firstName} {formData.lastName}</span>
+                  <span className="text-gray-600">Telefón:</span>
+                  <span className="font-medium">{formData.phone || "-"}</span>
+                  <span className="text-gray-600">Inštitúcia:</span>
+                  <span className="font-medium">{formData.affiliation || "-"}</span>
+                </div>
+              </div>
+
+              <form onSubmit={handleAccountSubmit} className="space-y-6">
+                <div className="space-y-2">
+                  <h3 className="text-2xl font-semibold">Ďalší krok:</h3>
+                  <p className="text-gray-600">
+                    Vytvorte si účet s emailom a heslom pre prihlásenie do systému.
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email *</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => handleChange("email", e.target.value)}
+                      aria-invalid={Boolean(accountFieldErrors.email)}
+                      required
+                    />
+                    {renderFieldError(accountFieldErrors.email)}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Heslo *</Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      value={formData.password}
+                      onChange={(e) => handleChange("password", e.target.value)}
+                      aria-invalid={Boolean(accountFieldErrors.password)}
+                      required
+                    />
+                    {renderFieldError(accountFieldErrors.password)}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="confirmPassword">Potvrdenie hesla *</Label>
+                    <Input
+                      id="confirmPassword"
+                      type="password"
+                      value={formData.confirmPassword}
+                      onChange={(e) => handleChange("confirmPassword", e.target.value)}
+                      aria-invalid={Boolean(accountFieldErrors.confirmPassword)}
+                      required
+                    />
+                    {renderFieldError(accountFieldErrors.confirmPassword)}
+                  </div>
+                </div>
+
+                <Button type="submit" className="w-full" size="lg" disabled={accountLoading}>
+                  {accountLoading ? "Vytváram účet..." : "Vytvoriť účet"}
+                </Button>
+              </form>
             </CardContent>
           </Card>
         </div>
@@ -140,32 +349,41 @@ export function Registration() {
       <div className="container mx-auto max-w-2xl">
         <Card>
           <CardHeader>
-            <CardTitle className="text-2xl">Registrácia na konferenciu</CardTitle>
-            <CardDescription>
+            <CardTitle className="text-3xl">Registrácia na konferenciu</CardTitle>
+            <CardDescription className="text-base">
               Vyplňte základné údaje. Prihlasovacie údaje vám budú zaslané emailom.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {error && (
+            {detailsError && (
               <Alert variant="destructive" className="mb-6">
                 <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{error}</AlertDescription>
+                <AlertDescription>{detailsError}</AlertDescription>
               </Alert>
             )}
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Personal Information */}
+
+            {detailsFieldErrors.conferenceId && (
+              <Alert variant="destructive" className="mb-6">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{detailsFieldErrors.conferenceId}</AlertDescription>
+              </Alert>
+            )}
+
+            <form onSubmit={handleDetailsSubmit} className="space-y-6">
               <div className="space-y-4">
-                <h3 className="font-semibold text-lg">Osobné údaje</h3>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <h3 className="text-2xl font-semibold">Osobné údaje</h3>
+
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="firstName">Meno *</Label>
                     <Input
                       id="firstName"
                       value={formData.firstName}
                       onChange={(e) => handleChange("firstName", e.target.value)}
+                      aria-invalid={Boolean(detailsFieldErrors.firstName)}
                       required
                     />
+                    {renderFieldError(detailsFieldErrors.firstName)}
                   </div>
 
                   <div className="space-y-2">
@@ -174,23 +392,11 @@ export function Registration() {
                       id="lastName"
                       value={formData.lastName}
                       onChange={(e) => handleChange("lastName", e.target.value)}
+                      aria-invalid={Boolean(detailsFieldErrors.lastName)}
                       required
                     />
+                    {renderFieldError(detailsFieldErrors.lastName)}
                   </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email *</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => handleChange("email", e.target.value)}
-                    required
-                  />
-                  <p className="text-xs text-gray-500">
-                    Na tento email vám budú zaslané prihlasovacie údaje
-                  </p>
                 </div>
 
                 <div className="space-y-2">
@@ -201,7 +407,9 @@ export function Registration() {
                     placeholder="+421 XXX XXX XXX"
                     value={formData.phone}
                     onChange={(e) => handleChange("phone", e.target.value)}
+                    aria-invalid={Boolean(detailsFieldErrors.phone)}
                   />
+                  {renderFieldError(detailsFieldErrors.phone)}
                 </div>
 
                 <div className="space-y-2">
@@ -211,7 +419,9 @@ export function Registration() {
                     placeholder="Názov univerzity alebo inštitúcie"
                     value={formData.affiliation}
                     onChange={(e) => handleChange("affiliation", e.target.value)}
+                    aria-invalid={Boolean(detailsFieldErrors.affiliation)}
                   />
+                  {renderFieldError(detailsFieldErrors.affiliation)}
                 </div>
 
                 <div className="space-y-2">
@@ -220,20 +430,21 @@ export function Registration() {
                     id="country"
                     value={formData.country}
                     onChange={(e) => handleChange("country", e.target.value)}
+                    aria-invalid={Boolean(detailsFieldErrors.country)}
                   />
+                  {renderFieldError(detailsFieldErrors.country)}
                 </div>
               </div>
 
-              <Alert className="bg-blue-50 border-blue-200">
+              <Alert className="border-blue-200 bg-blue-50">
                 <AlertCircle className="h-4 w-4 text-blue-600" />
                 <AlertDescription className="text-blue-900 text-sm">
-                  Po odoslaní formulára vám na email príde automaticky vygenerované heslo.
-                  Následne sa budete môcť prihlásiť a dokončiť svoju registráciu (vybrať typ účasti, ubytovanie, stravu a vygenerovať faktúru).
+                  V ďalšom kroku vytvoríte účet s emailom a heslom pre prihlásenie do systému.
                 </AlertDescription>
               </Alert>
 
-              <Button type="submit" className="w-full" size="lg" disabled={loading}>
-                {loading ? "Spracovávam..." : "Zaregistrovať sa"}
+              <Button type="submit" className="w-full" size="lg" disabled={basicLoading}>
+                {basicLoading ? "Pokračujem..." : "Pokračovať"}
               </Button>
             </form>
           </CardContent>
