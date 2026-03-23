@@ -19,6 +19,13 @@ import { getParticipantByUserId, updateParticipant, type ParticipantPayload } fr
 import { getActiveConferences } from "../api/conferenceApi.ts";
 import { uploadParticipantFile } from "../api/fileManagerApi.ts";
 import { BASE_URL } from "../api/baseApi.ts";
+import {
+  createSubmission,
+  getSubmissionByParticipant,
+  SubmissionApiError,
+  updateSubmission,
+  type SubmissionPayload,
+} from "../api/submissionApi.ts";
 import { toast } from "sonner";
 
 const STUDENT_VERIFICATION_FILE_TYPE = 0;
@@ -59,13 +66,16 @@ export function Dashboard() {
   const [studentUploadError, setStudentUploadError] = useState("");
   const [willPresent, setWillPresent] = useState(false);
   const [presentationFile, setPresentationFile] = useState<File | null>(null);
+  const [submissionRecord, setSubmissionRecord] = useState<SubmissionPayload | null>(null);
+  const [submissionLoading, setSubmissionLoading] = useState(false);
   const [savingSubmission, setSavingSubmission] = useState(false);
+  const [uploadingPresentation, setUploadingPresentation] = useState(false);
   const [saveSubmissionError, setSaveSubmissionError] = useState("");
+  const [submissionFieldErrors, setSubmissionFieldErrors] = useState<Partial<Record<"submissionIdentifier" | "title" | "participantId" | "conferenceId", string>>>({});
+  const [submissionSuccessMessage, setSubmissionSuccessMessage] = useState("");
   const [submission, setSubmission] = useState({
-    submissionId: "",
+    submissionIdentifier: "",
     title: "",
-    abstract: "",
-    keywords: "",
   });
   const [accommodation, setAccommodation] = useState<number | null>(null);
   const [catering, setCatering] = useState<number[]>([]);
@@ -97,10 +107,15 @@ export function Dashboard() {
     setIsStudent(participant.isStudent);
     setSavedRegistrationType(participant.registrationType);
     setSavedIsStudent(participant.isStudent);
-    setWillPresent(
-      Boolean(participant.isPresenting) ||
-      participant.fileManagers.some((file) => normalizeFileType(file.fileType) === SUBMISSION_FILE_TYPE)
-    );
+  };
+
+  const applySubmissionState = (nextSubmission: SubmissionPayload | null) => {
+    setSubmissionRecord(nextSubmission);
+    setSubmission({
+      submissionIdentifier: nextSubmission?.submissionIdentifier ?? "",
+      title: nextSubmission?.title ?? "",
+    });
+    setWillPresent(nextSubmission?.isPresenting ?? false);
   };
 
   useEffect(() => {
@@ -155,6 +170,43 @@ export function Dashboard() {
     loadParticipant();
   }, [currentUser]);
 
+  useEffect(() => {
+    if (!participantDraft?.id) return;
+
+    let cancelled = false;
+
+    const loadSubmission = async () => {
+      setSubmissionLoading(true);
+      setSaveSubmissionError("");
+      setSubmissionFieldErrors({});
+
+      try {
+        const loadedSubmission = await getSubmissionByParticipant(participantDraft.id);
+        if (cancelled) return;
+        applySubmissionState(loadedSubmission);
+      } catch (error) {
+        if (cancelled) return;
+
+        if (error instanceof SubmissionApiError && error.code === "SUBMISSION_NOT_FOUND") {
+          applySubmissionState(null);
+          return;
+        }
+
+        setSaveSubmissionError(error instanceof Error ? error.message : "Načítanie príspevku zlyhalo");
+      } finally {
+        if (!cancelled) {
+          setSubmissionLoading(false);
+        }
+      }
+    };
+
+    loadSubmission();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [participantDraft?.id]);
+
   const updateDraft = (updates: Partial<ParticipantPayload>) => {
     setParticipantDraft((prev) => {
       if (!prev) return prev;
@@ -162,6 +214,37 @@ export function Dashboard() {
       localStorage.setItem("participantDraft", JSON.stringify(next));
       return next;
     });
+  };
+
+  const applySubmissionApiError = (error: unknown) => {
+    const nextErrors: Partial<Record<"submissionIdentifier" | "title" | "participantId" | "conferenceId", string>> = {};
+
+    if (error instanceof SubmissionApiError) {
+      if (error.validationErrors) {
+        Object.entries(error.validationErrors).forEach(([field, messages]) => {
+          const normalizedField = (field.charAt(0).toLowerCase() + field.slice(1)) as keyof typeof nextErrors;
+          if (normalizedField in nextErrors || ["submissionIdentifier", "title", "participantId", "conferenceId"].includes(normalizedField)) {
+            nextErrors[normalizedField] = messages[0];
+          }
+        });
+      }
+
+      if (error.field) {
+        const normalizedField = (error.field.charAt(0).toLowerCase() + error.field.slice(1)) as keyof typeof nextErrors;
+        if (["submissionIdentifier", "title", "participantId", "conferenceId"].includes(normalizedField)) {
+          nextErrors[normalizedField] = error.message;
+        }
+      }
+
+      setSubmissionFieldErrors(nextErrors);
+      if (Object.keys(nextErrors).length === 0) {
+        setSaveSubmissionError(error.message);
+      }
+      return;
+    }
+
+    setSubmissionFieldErrors({});
+    setSaveSubmissionError(error instanceof Error ? error.message : "Operácia s príspevkom zlyhala");
   };
 
   const handleSaveParticipation = async () => {
@@ -234,50 +317,73 @@ export function Dashboard() {
   };
 
   const handleSaveSubmission = async () => {
-    if (!participantDraft || !currentUser?.id) return;
+    if (!participantDraft?.id) {
+      setSaveSubmissionError("Participant nebol načítaný.");
+      return;
+    }
+
+    if (!participantDraft.conferenceId) {
+      setSubmissionFieldErrors({ conferenceId: "Konferencia nebola načítaná." });
+      setSaveSubmissionError("Konferencia nebola načítaná.");
+      return;
+    }
+
+    const nextErrors: Partial<Record<"submissionIdentifier" | "title" | "participantId" | "conferenceId", string>> = {};
+    if (!submission.submissionIdentifier.trim()) {
+      nextErrors.submissionIdentifier = "ID príspevku je povinné.";
+    }
+    if (!submission.title.trim()) {
+      nextErrors.title = "Názov príspevku je povinný.";
+    }
+
+    if (Object.keys(nextErrors).length > 0) {
+      setSubmissionFieldErrors(nextErrors);
+      setSaveSubmissionError("");
+      return;
+    }
 
     setSavingSubmission(true);
     setSaveSubmissionError("");
+    setSubmissionSuccessMessage("");
+    setSubmissionFieldErrors({});
     try {
-      let payload: ParticipantPayload = {
-        ...participantDraft,
-        isPresenting: willPresent
+      const payload = {
+        participantId: participantDraft.id,
+        conferenceId: participantDraft.conferenceId,
+        submissionIdentifier: submission.submissionIdentifier.trim(),
+        title: submission.title.trim(),
+        isPresenting: willPresent,
       };
 
-      if (!payload.conferenceId || payload.conferenceId === 0) {
-        const activeConferences = await getActiveConferences();
-        const activeConference = activeConferences[0];
-        if (!activeConference) {
-          throw new Error("Aktívna konferencia nebola nájdená.");
-        }
-        payload = { ...payload, conferenceId: activeConference.id };
-      }
+      const savedSubmission = submissionRecord?.id
+        ? await updateSubmission(submissionRecord.id, payload)
+        : await createSubmission(payload);
 
-      await updateParticipant(payload);
-      const refreshedParticipant = await getParticipantByUserId(currentUser.id);
-      applyParticipantState(refreshedParticipant);
-      toast.success("Zmeny v príspevku boli uložené.");
+      applySubmissionState(savedSubmission);
+      setSubmissionSuccessMessage(submissionRecord?.id ? "Zmeny príspevku boli uložené." : "Príspevok bol vytvorený.");
+      toast.success(submissionRecord?.id ? "Zmeny príspevku boli uložené." : "Príspevok bol vytvorený.");
     } catch (error) {
-      setSaveSubmissionError(error instanceof Error ? error.message : "Uloženie príspevku zlyhalo");
+      applySubmissionApiError(error);
     } finally {
       setSavingSubmission(false);
     }
   };
 
   const handleUploadSubmissionFile = async () => {
+    if (!submissionRecord?.id) {
+      setSaveSubmissionError("Najprv vytvorte alebo uložte príspevok.");
+      return;
+    }
+
     if (!participantDraft?.id || !currentUser?.id || !presentationFile) {
       setSaveSubmissionError("Vyberte súbor na odoslanie.");
       return;
     }
 
-    setSavingSubmission(true);
+    setUploadingPresentation(true);
     setSaveSubmissionError("");
     try {
-      const savedParticipant = await updateParticipant({
-        ...participantDraft,
-        isPresenting: true
-      });
-      await uploadParticipantFile(savedParticipant.id, SUBMISSION_FILE_TYPE, presentationFile);
+      await uploadParticipantFile(participantDraft.id, SUBMISSION_FILE_TYPE, presentationFile);
       const refreshedParticipant = await getParticipantByUserId(currentUser.id);
       applyParticipantState(refreshedParticipant);
       setPresentationFile(null);
@@ -285,7 +391,7 @@ export function Dashboard() {
     } catch (error) {
       setSaveSubmissionError(error instanceof Error ? error.message : "Odoslanie prezentácie zlyhalo");
     } finally {
-      setSavingSubmission(false);
+      setUploadingPresentation(false);
     }
   };
 
@@ -298,8 +404,8 @@ export function Dashboard() {
           ? 2
           : null;
 
-    updateDraft({ registrationType, isStudent, isPresenting: willPresent });
-  }, [participationType, isStudent, willPresent]);
+    updateDraft({ registrationType, isStudent });
+  }, [participationType, isStudent]);
 
   const accommodationOptions = [
     { id: 1, name: "Hotel Devín - Jednolôžková", price: 85 },
@@ -393,12 +499,12 @@ export function Dashboard() {
     ? latestSubmissionFile.originalFileName || latestSubmissionFile.fileName
     : "";
   const submissionStatusLabel = (() => {
-    if (!willPresent && !latestSubmissionFile) return "Nie";
-    if (!latestSubmissionFile) return "Zvolený, neposlaný";
+    if (!submissionRecord && !latestSubmissionFile) return "Nie";
+    if (!latestSubmissionFile) return "Vytvorený";
     if (latestSubmissionFileStatus === WAITING_FOR_APPROVAL_STATUS) return "Čaká na schválenie";
     if (latestSubmissionFileStatus === APPROVED_STATUS) return "Schválené";
     if (latestSubmissionFileStatus === REJECTED_STATUS) return "Zamietnutý";
-    return "Zvolený, neposlaný";
+    return "Vytvorený";
   })();
   const getFileViewUrl = (fileManagerId: number) => `${BASE_URL}/api/file-manager/view/${fileManagerId}`;
   const getFileDownloadUrl = (fileManagerId: number) => `${BASE_URL}/api/file-manager/download/${fileManagerId}`;
@@ -666,15 +772,23 @@ export function Dashboard() {
               <CardContent className="space-y-4">
                 {participationType === "participantWithSubmission" ? (
                   <>
+                    {submissionLoading && (
+                      <p className="text-sm text-gray-600">Načítavam príspevok...</p>
+                    )}
+
                     <div className="space-y-4">
                       <div className="space-y-2">
-                        <Label htmlFor="submissionId">ID príspevku *</Label>
+                        <Label htmlFor="submissionIdentifier">ID príspevku *</Label>
                         <Input
-                          id="submissionId"
-                          value={submission.submissionId}
-                          onChange={(e) => setSubmission({ ...submission, submissionId: e.target.value })}
+                          id="submissionIdentifier"
+                          value={submission.submissionIdentifier}
+                          onChange={(e) => setSubmission({ ...submission, submissionIdentifier: e.target.value })}
                           placeholder="ID vášho príspevku"
+                          aria-invalid={Boolean(submissionFieldErrors.submissionIdentifier)}
                         />
+                        {submissionFieldErrors.submissionIdentifier && (
+                          <p className="text-sm text-red-600">{submissionFieldErrors.submissionIdentifier}</p>
+                        )}
                       </div>
 
                       <div className="space-y-2">
@@ -684,7 +798,11 @@ export function Dashboard() {
                           value={submission.title}
                           onChange={(e) => setSubmission({...submission, title: e.target.value})}
                           placeholder="Názov vášho príspevku"
+                          aria-invalid={Boolean(submissionFieldErrors.title)}
                         />
+                        {submissionFieldErrors.title && (
+                          <p className="text-sm text-red-600">{submissionFieldErrors.title}</p>
+                        )}
                       </div>
 
                       <div className="space-y-3 rounded-lg border bg-gray-50 p-4">
@@ -763,6 +881,14 @@ export function Dashboard() {
                                 Nahrajte prezentáciu. Ak ju ešte nemáte pripravenú, môžete ju doplniť neskôr.
                               </p>
                             </div>
+                            {!submissionRecord?.id && (
+                              <Alert className="border-blue-200 bg-blue-50">
+                                <AlertCircle className="h-4 w-4 text-blue-600" />
+                                <AlertDescription className="text-blue-900">
+                                  Najprv vytvorte alebo uložte príspevok, potom môžete odoslať prezentáciu.
+                                </AlertDescription>
+                              </Alert>
+                            )}
                             <Input
                               id="presentationUpload"
                               type="file"
@@ -776,13 +902,22 @@ export function Dashboard() {
                               type="button"
                               className="w-full sm:w-auto"
                               onClick={handleUploadSubmissionFile}
-                              disabled={!presentationFile || savingSubmission}
+                              disabled={!presentationFile || uploadingPresentation || !submissionRecord?.id}
                             >
-                              {savingSubmission ? "Odosielam..." : "Odoslať na overenie"}
+                              {uploadingPresentation ? "Odosielam..." : "Odoslať na overenie"}
                             </Button>
                           </div>
                         )}
                       </div>
+
+                      {submissionSuccessMessage && (
+                        <Alert className="border-emerald-200 bg-emerald-50">
+                          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                          <AlertDescription className="text-emerald-900">
+                            {submissionSuccessMessage}
+                          </AlertDescription>
+                        </Alert>
+                      )}
 
                       {saveSubmissionError && (
                         <Alert variant="destructive">
@@ -791,8 +926,12 @@ export function Dashboard() {
                         </Alert>
                       )}
 
-                      <Button type="button" className="w-full" onClick={handleSaveSubmission} disabled={savingSubmission}>
-                        Uložiť príspevok
+                      <Button type="button" className="w-full" onClick={handleSaveSubmission} disabled={savingSubmission || submissionLoading}>
+                        {savingSubmission
+                          ? "Ukladám..."
+                          : submissionRecord?.id
+                            ? "Uložiť zmeny"
+                            : "Vytvoriť príspevok"}
                       </Button>
                     </div>
                   </>

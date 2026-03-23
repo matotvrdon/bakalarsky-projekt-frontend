@@ -24,7 +24,9 @@ export function Root() {
 
   const navigation = [
     { name: "Domov", href: "/" },
+    { name: "Komisie", href: "/committees" },
     { name: "Program", href: "/schedule" },
+    { name: "Príspevky", href: "/submissions" },
     { name: "Prednášajúci", href: "/speakers" },
     { name: "Registrácia", href: "/register" },
   ];

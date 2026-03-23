@@ -1,265 +1,131 @@
-import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card.tsx";
-import { Button } from "../components/ui/button.tsx";
-import { Input } from "../components/ui/input.tsx";
-import { Label } from "../components/ui/label.tsx";
-import { Textarea } from "../components/ui/textarea.tsx";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../components/ui/select.tsx";
-import { toast } from "sonner";
-import { FileText, CheckCircle } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
+import { FileText, AlertCircle } from "lucide-react";
 
 export function Submissions() {
-  const [submitted, setSubmitted] = useState(false);
-  const [formData, setFormData] = useState({
-    title: "",
-    abstract: "",
-    authors: "",
-    email: "",
-    affiliation: "",
-    category: "",
-    keywords: "",
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // Simulate submission
-    setSubmitted(true);
-    toast.success("Príspevok bol úspešne odoslaný!");
-  };
-
-  if (submitted) {
-    return (
-      <div className="py-12">
-        <div className="container mx-auto px-4 max-w-2xl">
-          <Card className="text-center py-12">
-            <CardContent>
-              <div className="flex justify-center mb-6">
-                <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center">
-                  <CheckCircle className="w-12 h-12 text-green-600" />
-                </div>
-              </div>
-              <h2 className="text-3xl font-bold mb-4">Úspešne odoslané!</h2>
-              <p className="text-gray-600 mb-6">
-                Váš príspevok bol úspešne prijatý. Do 1. apríla 2026 obdržíte
-                notifikáciu o prijatí či zamietnutí.
-              </p>
-              <p className="text-sm text-gray-500 mb-8">
-                Referenčné číslo: SC2026-{Math.floor(Math.random() * 10000)}
-              </p>
-              <Button onClick={() => setSubmitted(false)}>
-                Odoslať ďalší príspevok
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="py-12">
-      <div className="container mx-auto px-4 max-w-4xl">
-        {/* Header */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold mb-4">Odoslať príspevok</h1>
-          <p className="text-xl text-gray-600">
-            Uzávierka prihlášok: 1. marca 2026
-          </p>
+      <div className="py-12 bg-gray-50 min-h-screen">
+        <div className="container mx-auto px-4 max-w-6xl">
+          {/* Header */}
+          <div className="mb-12">
+            <h1 className="text-4xl font-bold mb-2">Príspevky</h1>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Main Content - Left Column (2/3) */}
+            <div className="lg:col-span-2 space-y-8">
+              {/* Final Paper Preparation */}
+              <section>
+                <h2 className="text-2xl font-bold mb-4">Príprava a odoslanie finálneho príspevku</h2>
+
+                <div className="space-y-4 text-gray-700">
+                  <p>
+                    Pred odoslaním finálneho príspevku musia autori použiť{" "}
+                    <a href="#" className="text-blue-600 hover:underline">IEEE PDF eXpress</a>{" "}
+                    aby sa uistili, že príspevok je kompatibilný s IEEE Xplore. Ak spĺňa formát a požiadavky, bude
+                    zahrnutý do databázy IEEE Xplore po konferencii. ID konferencie je{" "}
+                    <strong className="text-red-600">622MM</strong>.
+                  </p>
+
+                  <p>
+                    Keď je status príspevku "Pass", kliknite na tlačidlo "Approve" v poli Action.
+                    Potom sa status zmení na "Approved".
+                  </p>
+
+                  <p>
+                    Stránka na odovzdanie finálnych príspevkov je otvorená do{" "}
+                    <strong>2. novembra</strong>. Žiadny príspevok nie je akceptovaný po tomto termíne.
+                    Autori môžu odoslať príspevok len raz, duplicitné príspevky nie sú akceptované.
+                  </p>
+
+                  <p>
+                    Nahrajte schválenú verziu PDF do{" "}
+                    <a href="#" className="text-blue-600 hover:underline">EasyChair systému</a>.
+                  </p>
+                </div>
+              </section>
+
+              {/* Paper Preparation */}
+              <section>
+                <h2 className="text-2xl font-bold mb-4">Príprava príspevku</h2>
+
+                <div className="space-y-4 text-gray-700">
+                  <p>
+                    Odoslané príspevky by mali obsahovať pôvodné nepublikované výsledky v téme konferencie.{" "}
+                    <strong>Príspevky by nemali prekročiť 6 strán</strong>. Extra strany stoja 10€ za stranu.
+                    Všetky príspevky prejdú peer review procesom a každý príspevok bude posúdený dvoma recenzentmi.
+                  </p>
+
+                  <p>
+                    Príspevky sú určené na publikovanie v IEEE šablóne. Autori môžu použiť buď LaTeX{" "}
+                    <em>(preferované)</em> alebo Microsoft Word{" "}
+                    <a href="#" className="text-blue-600 hover:underline">šablónu od IEEE</a>.
+                    Pre Word verziu by ste mali vybrať <strong>A4 verziu</strong> šablóny.
+                  </p>
+
+                  <div className="bg-gray-100 p-4 rounded font-mono text-sm">
+                    \documentclass[conference, a4paper]&#123;IEEEtran&#125;
+                  </div>
+
+                  <p className="text-sm">Pre viac informácií pozri dokumentáciu šablóny.</p>
+
+                  <p>
+                    Príspevky sú spravované cez{" "}
+                    <a href="#" className="text-blue-600 hover:underline">EasyChair systém</a>.
+                    Proces odoslania príspevku pozostáva z dvoch krokov:
+                  </p>
+
+                  <ol className="list-decimal list-inside space-y-2 ml-4">
+                    <li>
+                      <strong>Odoslanie abstraktu</strong> – musíte vytvoriť nové odoslanie v EasyChair
+                      bez plného textu príspevku. <em>Abstrakt by mal obsahovať viac ako 150 slov</em> vrátane
+                      názvu, mien, afiliácie autorov a navrhnutej témy.
+                    </li>
+                    <li>
+                      <strong>Odoslanie plného príspevku</strong> – pridáte plný príspevok vo formáte PDF k odoslaniu.
+                    </li>
+                  </ol>
+                </div>
+              </section>
+            </div>
+
+            {/* Sidebar - Right Column (1/3) */}
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <AlertCircle className="w-5 h-5" />
+                    Dôležité informácie
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4 text-sm text-gray-700">
+                  <p>
+                    Konferencia sa riadi štandardami IEEE Conference Search Conference proceedings,
+                    ktoré spĺňajú normy pre kvalitný peer review a môžu byť oprávnené na zahrnutie v IEEE Xplore.
+                  </p>
+
+                  <p>
+                    Autori sú vyzvaní, aby sa vyhýbali tomu, aby sa príspevok distribuoval po konferencii
+                    (napr. odstránený z IEEE Xplore). Ak príspevok nie je prezentovaný na konferencii,
+                    nebude publikovaný.
+                  </p>
+
+                  <div className="border-t pt-4 mt-4">
+                    <p className="font-semibold mb-2">
+                      "Pay to publish" nie je povolené IEEE:
+                    </p>
+                    <p>
+                      Najmenej jeden autor príspevku sa musí ukázať a prezentovať príspevok na konferencii.
+                    </p>
+                  </div>
+
+                  <p className="border-t pt-4 mt-4">
+                    Príspevky budú kontrolované proti plagiátorstvu.
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
         </div>
-
-        {/* Guidelines */}
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="w-5 h-5" />
-              Pokyny pre autorov
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-2 text-gray-600">
-              <li>• Abstrakt by mal obsahovať 200-500 slov</li>
-              <li>• Uveďte všetkých autorov a ich afiliácie</li>
-              <li>• Vyberte kategóriu, ktorá najlepšie opisuje váš výskum</li>
-              <li>• Príspevky môžu byť v slovenčine alebo angličtine</li>
-              <li>• Prijaté príspevky budú prezentované ako prednáška alebo poster</li>
-            </ul>
-          </CardContent>
-        </Card>
-
-        {/* Submission Form */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Formulár na odoslanie príspevku</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div>
-                <Label htmlFor="title">Názov príspevku *</Label>
-                <Input
-                  id="title"
-                  required
-                  value={formData.title}
-                  onChange={(e) =>
-                    setFormData({ ...formData, title: e.target.value })
-                  }
-                  placeholder="Zadajte názov vášho príspevku"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="abstract">Abstrakt *</Label>
-                <Textarea
-                  id="abstract"
-                  required
-                  value={formData.abstract}
-                  onChange={(e) =>
-                    setFormData({ ...formData, abstract: e.target.value })
-                  }
-                  placeholder="Stručne popíšte váš výskum (200-500 slov)"
-                  rows={8}
-                />
-                <p className="text-sm text-gray-500 mt-1">
-                  {formData.abstract.split(" ").filter((w) => w).length} slov
-                </p>
-              </div>
-
-              <div>
-                <Label htmlFor="authors">Autori *</Label>
-                <Input
-                  id="authors"
-                  required
-                  value={formData.authors}
-                  onChange={(e) =>
-                    setFormData({ ...formData, authors: e.target.value })
-                  }
-                  placeholder="Meno Priezvisko, Meno Priezvisko, ..."
-                />
-                <p className="text-sm text-gray-500 mt-1">
-                  Uveďte všetkých autorov oddelených čiarkou
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <Label htmlFor="email">Email *</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    required
-                    value={formData.email}
-                    onChange={(e) =>
-                      setFormData({ ...formData, email: e.target.value })
-                    }
-                    placeholder="vas@email.com"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="affiliation">Inštitúcia *</Label>
-                  <Input
-                    id="affiliation"
-                    required
-                    value={formData.affiliation}
-                    onChange={(e) =>
-                      setFormData({ ...formData, affiliation: e.target.value })
-                    }
-                    placeholder="Názov univerzity alebo inštitúcie"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="category">Kategória *</Label>
-                <Select
-                  value={formData.category}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, category: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Vyberte kategóriu" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ai">
-                      Umelá inteligencia a strojové učenie
-                    </SelectItem>
-                    <SelectItem value="bio">Biotechnológie a medicína</SelectItem>
-                    <SelectItem value="energy">Obnoviteľné zdroje energie</SelectItem>
-                    <SelectItem value="quantum">
-                      Kvantová fyzika a výpočty
-                    </SelectItem>
-                    <SelectItem value="climate">
-                      Klimatické zmeny a udržateľnosť
-                    </SelectItem>
-                    <SelectItem value="neuro">
-                      Neurológia a kognitívne vedy
-                    </SelectItem>
-                    <SelectItem value="other">Iné</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="keywords">Kľúčové slová</Label>
-                <Input
-                  id="keywords"
-                  value={formData.keywords}
-                  onChange={(e) =>
-                    setFormData({ ...formData, keywords: e.target.value })
-                  }
-                  placeholder="kľúčové slovo 1, kľúčové slovo 2, ..."
-                />
-                <p className="text-sm text-gray-500 mt-1">
-                  Zadajte 3-5 kľúčových slov oddelených čiarkou
-                </p>
-              </div>
-
-              <div className="flex gap-4">
-                <Button type="submit" className="flex-1">
-                  Odoslať príspevok
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() =>
-                    setFormData({
-                      title: "",
-                      abstract: "",
-                      authors: "",
-                      email: "",
-                      affiliation: "",
-                      category: "",
-                      keywords: "",
-                    })
-                  }
-                >
-                  Vyčistiť
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-
-        {/* Contact Info */}
-        <Card className="mt-8">
-          <CardHeader>
-            <CardTitle>Potrebujete pomoc?</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-gray-600">
-              Ak máte otázky týkajúce sa odoslania príspevku, kontaktujte nás na:
-              <br />
-              <strong>martin@mtvrdon.sk</strong>
-            </p>
-          </CardContent>
-        </Card>
       </div>
-    </div>
   );
 }
