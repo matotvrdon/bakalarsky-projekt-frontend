@@ -2,11 +2,13 @@ import { Outlet, Link, useLocation } from "react-router";
 import { Menu, X, LogIn, LogOut, UserCircle } from "lucide-react";
 import { Button } from "../components/ui/button.tsx";
 import { useState, useEffect } from "react";
+import { useActiveConference } from "../hooks/useActiveConference.ts";
 
 export function Root() {
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const activeConference = useActiveConference();
 
   // Check if user is logged in
   useEffect(() => {
@@ -41,6 +43,8 @@ export function Root() {
     setMobileMenuOpen(false);
   }, [location.pathname]);
 
+  const conferenceName = activeConference?.name || "Conference.Name";
+
   return (
     <div className="min-h-screen flex flex-col">
       {/* Header */}
@@ -48,7 +52,7 @@ export function Root() {
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between h-16">
             <Link to="/" className="font-bold text-xl">
-              INFORMATICS 2026
+              {conferenceName}
             </Link>
 
             {/* Desktop Navigation */}

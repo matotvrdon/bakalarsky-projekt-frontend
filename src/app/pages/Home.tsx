@@ -1,12 +1,14 @@
 import { Link } from "react-router";
+import { Calendar, Users, FileText, MapPin } from "lucide-react";
 import { Button } from "../components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card.tsx";
-import { Calendar, Users, FileText, MapPin } from "lucide-react";
+import { type ImportantDate } from "../api/conferenceApi.ts";
+import { useActiveConference } from "../hooks/useActiveConference.ts";
 
 const conferenceHighlights = [
-  "INFORMATICS 2026 prepaja vyskum, aplikovany vyvoj a akademicku spolupracu.",
+  "INFORMATICS prepaja vyskum, aplikovany vyvoj a akademicku spolupracu.",
   "Program je postaveny na kratkych odbornych vystupeniach, diskusii a prezentacii aktualnych vysledkov.",
-  "Struktura je pripravena tak, aby sa tento obsah dal neskor nahradzat datami z admin rozhrania.",
+  "Obsah domovskej stranky je pripraveny na napojenie na data spravovane z admin rozhrania.",
 ];
 
 const conferenceScopes = [
@@ -18,28 +20,97 @@ const conferenceScopes = [
   "Educational Technologies and Digital Learning",
 ];
 
+const fallbackImportantDates = [
+  {
+    id: 1,
+    label: "Uzávierka abstraktov",
+    normalDate: "2026-03-01",
+    updatedDate: null,
+    importantDatesStatus: "Normal" as const,
+  },
+  {
+    id: 2,
+    label: "Odovzdanie finálnych príspevkov",
+    normalDate: "2026-04-01",
+    updatedDate: "2026-04-10",
+    importantDatesStatus: "Extended" as const,
+  },
+  {
+    id: 3,
+    label: "Early bird registrácia",
+    normalDate: "2026-04-15",
+    updatedDate: "2026-04-10",
+    importantDatesStatus: "Shortened" as const,
+  },
+];
+
+const formatDate = (value?: string | null) => {
+  if (!value) return "";
+
+  const [year, month, day] = value.split("-");
+  if (!year || !month || !day) return value;
+
+  return `${day}.${month}.${year}`;
+};
+
+const formatConferenceRange = (startDate?: string, endDate?: string) => {
+  if (!startDate || !endDate) return "";
+
+  const start = formatDate(startDate);
+  const end = formatDate(endDate);
+
+  return `${start} - ${end}`;
+};
+
+const isDateUpdated = (importantDate: ImportantDate) =>
+  Boolean(importantDate.updatedDate && importantDate.updatedDate !== importantDate.normalDate);
+
+const getDateStatusLabel = (importantDate: ImportantDate) => {
+  if (importantDate.importantDatesStatus === "Extended") return "Predĺžené";
+  if (importantDate.importantDatesStatus === "Shortened") return "Skrátené";
+  return null;
+};
+
+const getDateStatusClassName = (importantDate: ImportantDate) => {
+  if (importantDate.importantDatesStatus === "Extended") return "bg-emerald-400/12 text-emerald-50 border border-emerald-200/20";
+  if (importantDate.importantDatesStatus === "Shortened") return "bg-amber-300/14 text-amber-50 border border-amber-200/20";
+  return "bg-white/8 text-white/88 border border-white/10";
+};
+
+const getDateCardClassName = (importantDate: ImportantDate) => {
+  if (importantDate.importantDatesStatus === "Extended") return "border-emerald-100/18 bg-white/10";
+  if (importantDate.importantDatesStatus === "Shortened") return "border-amber-100/18 bg-white/10";
+  return "border-white/10 bg-white/10";
+};
+
 export function Home() {
+  const activeConference = useActiveConference();
+
+  const conferenceName = activeConference?.name || "Conference.Name";
+  const conferenceDescription = activeConference?.description || "Conference.Description";
+  const conferenceLocation = activeConference?.location || "Conference.Location";
+  const conferenceDateRange =
+    formatConferenceRange(activeConference?.startDate, activeConference?.endDate) || "Conference.StartDate - Conference.EndDate";
+  const importantDates = activeConference?.settings?.importantDates?.length
+    ? activeConference.settings.importantDates
+    : fallbackImportantDates;
+
   return (
     <div>
-      {/* Hero Section */}
       <section className="relative bg-gradient-to-br from-blue-600 to-blue-800 text-white py-20 md:py-32">
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-1 items-start gap-12 lg:grid-cols-2">
             <div className="max-w-3xl">
-              <h1 className="text-4xl md:text-6xl font-bold mb-6">
-                18. ročník medzinárodnej vedeckej konferencia 2026
-              </h1>
-              <p className="text-xl md:text-2xl mb-8 text-blue-100">
-                Spojenie najlepších vedeckých myslí z celého sveta
-              </p>
+              <h1 className="text-4xl md:text-6xl font-bold mb-6">{conferenceName}</h1>
+              <p className="text-xl md:text-2xl mb-8 text-blue-100">{conferenceDescription}</p>
               <div className="flex flex-col sm:flex-row gap-4 mb-8">
                 <div className="flex items-center gap-2">
                   <Calendar className="w-5 h-5" />
-                  <span>18-20 november 2026</span>
+                  <span>{conferenceDateRange}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <MapPin className="w-5 h-5" />
-                  <span>Poprad, Slovensko</span>
+                  <span>{conferenceLocation}</span>
                 </div>
               </div>
               <div className="flex flex-wrap gap-4">
@@ -56,36 +127,60 @@ export function Home() {
               </div>
             </div>
 
-            <div className="rounded-2xl border border-white/20 bg-white/10 p-6 backdrop-blur-sm">
-              <h2 className="mb-6 text-2xl font-semibold text-white">Dôležité termíny</h2>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div className="rounded-xl bg-white/10 p-4">
-                  <div className="text-lg font-bold text-white">1.3.2026</div>
-                  <div className="mt-1 font-semibold text-white">Uzávierka prihlášok</div>
-                  <div className="text-sm text-blue-100">Posledný termín na odoslanie príspevkov</div>
-                </div>
-                <div className="rounded-xl bg-white/10 p-4">
-                  <div className="text-lg font-bold text-white">1.4.2026</div>
-                  <div className="mt-1 font-semibold text-white">Notifikácia o prijatí</div>
-                  <div className="text-sm text-blue-100">Oznámenie o prijatí alebo zamietnutí príspevku</div>
-                </div>
-                <div className="rounded-xl bg-white/10 p-4">
-                  <div className="text-lg font-bold text-white">15.4.2026</div>
-                  <div className="mt-1 font-semibold text-white">Skorá registrácia</div>
-                  <div className="text-sm text-blue-100">Koniec zľavneného registračného poplatku</div>
-                </div>
-                <div className="rounded-xl bg-white/10 p-4">
-                  <div className="text-lg font-bold text-white">15-17.5.2026</div>
-                  <div className="mt-1 font-semibold text-white">Konferencia</div>
-                  <div className="text-sm text-blue-100">Hlavné dni podujatia</div>
-                </div>
+            <div className="rounded-2xl border border-white/20 bg-gradient-to-br from-white/12 to-white/6 p-6 md:p-8 backdrop-blur-md">
+              <h2 className="mb-6 text-2xl font-bold tracking-tight text-white md:text-3xl">Dôležité termíny</h2>
+              <div className="space-y-3 md:space-y-4">
+                {importantDates.map((importantDate) => (
+                  <div
+                    key={`${importantDate.label}-${importantDate.normalDate}-${importantDate.updatedDate ?? "normal"}`}
+                    className={`group rounded-2xl p-5 md:p-6 transition-all duration-300 backdrop-blur-sm border ${
+                      importantDate.importantDatesStatus === "Extended"
+                        ? "border-emerald-400/30 bg-gradient-to-br from-emerald-400/12 to-emerald-500/6"
+                        : importantDate.importantDatesStatus === "Shortened"
+                          ? "border-amber-300/30 bg-gradient-to-br from-amber-300/12 to-amber-400/6"
+                          : "border-white/20 bg-gradient-to-br from-white/12 to-white/6"
+                    }`}
+                  >
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                      <div className="min-w-fit">
+                        {isDateUpdated(importantDate) ? (
+                          <div className="space-y-1">
+                            <div className="text-xs font-medium text-white/40 line-through decoration-white/30">
+                              {formatDate(importantDate.normalDate)}
+                            </div>
+                            <div className="text-xl md:text-2xl font-bold text-white tracking-tight">
+                              {formatDate(importantDate.updatedDate)}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-xl md:text-2xl font-bold text-white tracking-tight">
+                            {formatDate(importantDate.normalDate)}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex min-w-0 flex-col gap-2">
+                        <p className="text-sm md:text-base font-semibold leading-tight text-white/95">
+                          {importantDate.label || "Názov termínu"}
+                        </p>
+                        {getDateStatusLabel(importantDate) && (
+                          <span
+                            className={`inline-flex w-fit rounded-full px-2.5 py-1 text-xs font-bold tracking-wide ${getDateStatusClassName(
+                              importantDate
+                            )}`}
+                          >
+                            {getDateStatusLabel(importantDate)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Key Info Section */}
       <section className="py-16 bg-white">
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -134,7 +229,6 @@ export function Home() {
         </div>
       </section>
 
-      {/* Conference Info Section */}
       <section className="py-16 bg-gray-50">
         <div className="container mx-auto px-4">
           <div className="mb-8 max-w-3xl">
@@ -186,14 +280,13 @@ export function Home() {
         </div>
       </section>
 
-      {/* CTA Section */}
       <section className="py-16 bg-blue-600 text-white">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">
             Pripravení sa pripojiť?
           </h2>
           <p className="text-xl mb-8 text-blue-100">
-            Registrácia je otvorená do 1. apríla 2026
+            Registrácia je otvorená počas aktívnej konferencie
           </p>
           <Link to="/register">
             <Button size="lg" variant="secondary">

@@ -37,7 +37,11 @@ import {
   getAllConferences,
   createConference,
   updateConference,
-  deleteConference
+  deleteConference,
+  createConferenceSettings,
+  updateConferenceImportantDate,
+  type ConferenceSettings,
+  type ImportantDate
 } from "../api/conferenceApi.ts";
 import { getParticipantsByActiveConference, type FileManagerPayload } from "../api/participantApi.ts";
 import { BASE_URL } from "../api/baseApi.ts";
@@ -52,6 +56,19 @@ type Conference = {
   location: string;
   isActive: boolean;
   participantsCount: number;
+  settings?: ConferenceSettings | null;
+};
+
+type ImportantDateCreateForm = {
+  label: string;
+  normalDate: string;
+};
+
+type ImportantDateUpdateForm = {
+  id: number;
+  label: string;
+  normalDate: string;
+  updatedDate: string;
 };
 
 type Participant = {
@@ -185,6 +202,19 @@ const isImageFile = (fileName: string) => {
   return name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".png") || name.endsWith(".webp");
 };
 
+const mapImportantDatesToEditForm = (importantDates?: ImportantDate[] | null): ImportantDateUpdateForm[] => {
+  if (!importantDates || importantDates.length === 0) {
+    return [{ id: 0, normalDate: "", updatedDate: "" }];
+  }
+
+  return importantDates.map((importantDate) => ({
+    id: importantDate.id,
+    label: importantDate.label ?? "",
+    normalDate: importantDate.normalDate,
+    updatedDate: importantDate.updatedDate ?? "",
+  }));
+};
+
 type Invoice = {
   id: number;
   invoiceNumber: string;
@@ -260,7 +290,16 @@ export function Admin() {
     endDate: "",
     location: "",
   });
+  const [newImportantDates, setNewImportantDates] = useState<ImportantDateCreateForm[]>([
+    { label: "", normalDate: "" }
+  ]);
   const [editConference, setEditConference] = useState<Conference | null>(null);
+  const [editImportantDates, setEditImportantDates] = useState<ImportantDateUpdateForm[]>([
+    { id: 0, label: "", normalDate: "", updatedDate: "" }
+  ]);
+  const [additionalImportantDates, setAdditionalImportantDates] = useState<ImportantDateCreateForm[]>([
+    { label: "", normalDate: "" }
+  ]);
   const [editParticipant, setEditParticipant] = useState<Participant | null>(null);
   const [editInvoice, setEditInvoice] = useState<Invoice | null>(null);
 
@@ -336,20 +375,50 @@ export function Admin() {
     }
   };
 
+  const normalizedCreateImportantDates = newImportantDates
+    .map((importantDate) => ({
+      label: importantDate.label.trim(),
+      normalDate: importantDate.normalDate.trim()
+    }))
+    .filter((importantDate) => importantDate.label && importantDate.normalDate);
+
+  const normalizedEditImportantDates = editImportantDates
+    .map((importantDate) => ({
+      id: importantDate.id,
+      label: importantDate.label.trim(),
+      updatedDate: importantDate.updatedDate.trim() || null
+    }))
+    .filter((importantDate) => importantDate.id > 0 && importantDate.label);
+
+  const normalizedAdditionalImportantDates = additionalImportantDates
+    .map((importantDate) => ({
+      label: importantDate.label.trim(),
+      normalDate: importantDate.normalDate.trim()
+    }))
+    .filter((importantDate) => importantDate.label && importantDate.normalDate);
+
   const handleCreateConference = async () => {
     if (!newConference.name || !newConference.startDate || !newConference.endDate) return;
     try {
-      await createConference({
+      const conference = await createConference({
         name: newConference.name,
         startDate: newConference.startDate,
         endDate: newConference.endDate,
         location: newConference.location
       });
+      if (normalizedCreateImportantDates.length > 0) {
+        await createConferenceSettings(conference.id, {
+          importantDates: normalizedCreateImportantDates
+        });
+      }
       setNewConferenceDialog(false);
       setNewConference({ name: "", startDate: "", endDate: "", location: "" });
+      setNewImportantDates([{ label: "", normalDate: "" }]);
+      toast.success("Konferencia bola vytvorená.");
       loadConferences();
     } catch (error) {
       console.error("Failed to create conference", error);
+      toast.error("Vytvorenie konferencie zlyhalo.");
     }
   };
 
@@ -363,11 +432,30 @@ export function Admin() {
         location: editConference.location,
         isActive: editConference.isActive
       });
+      if (normalizedEditImportantDates.length > 0) {
+        await Promise.all(
+          normalizedEditImportantDates.map((importantDate) =>
+            updateConferenceImportantDate(editConference.id, importantDate.id, {
+              label: importantDate.label,
+              updatedDate: importantDate.updatedDate
+            })
+          )
+        );
+      }
+      if (normalizedAdditionalImportantDates.length > 0) {
+        await createConferenceSettings(editConference.id, {
+          importantDates: normalizedAdditionalImportantDates
+        });
+      }
       setEditConferenceDialog(false);
       setEditConference(null);
+      setEditImportantDates([{ id: 0, label: "", normalDate: "", updatedDate: "" }]);
+      setAdditionalImportantDates([{ label: "", normalDate: "" }]);
+      toast.success("Konferencia bola upravená.");
       loadConferences();
     } catch (error) {
       console.error("Failed to update conference", error);
+      toast.error("Úprava konferencie zlyhala.");
     }
   };
 
@@ -457,6 +545,54 @@ export function Admin() {
 
   const getFileViewUrl = (fileManagerId: number) => `${BASE_URL}/api/file-manager/view/${fileManagerId}`;
   const getFileDownloadUrl = (fileManagerId: number) => `${BASE_URL}/api/file-manager/download/${fileManagerId}`;
+
+  const updateNewImportantDate = (index: number, field: keyof ImportantDateCreateForm, value: string) => {
+    setNewImportantDates((currentDates) =>
+      currentDates.map((importantDate, currentIndex) =>
+        currentIndex === index ? { ...importantDate, [field]: value } : importantDate
+      )
+    );
+  };
+
+  const addNewImportantDate = () => {
+    setNewImportantDates((currentDates) => [...currentDates, { label: "", normalDate: "" }]);
+  };
+
+  const removeNewImportantDate = (index: number) => {
+    setNewImportantDates((currentDates) =>
+      currentDates.length === 1
+        ? [{ label: "", normalDate: "" }]
+        : currentDates.filter((_, currentIndex) => currentIndex !== index)
+    );
+  };
+
+  const updateEditImportantDate = (index: number, field: keyof ImportantDateUpdateForm, value: string) => {
+    setEditImportantDates((currentDates) =>
+      currentDates.map((importantDate, currentIndex) =>
+        currentIndex === index ? { ...importantDate, [field]: value } : importantDate
+      )
+    );
+  };
+
+  const updateAdditionalImportantDate = (index: number, field: keyof ImportantDateCreateForm, value: string) => {
+    setAdditionalImportantDates((currentDates) =>
+      currentDates.map((importantDate, currentIndex) =>
+        currentIndex === index ? { ...importantDate, [field]: value } : importantDate
+      )
+    );
+  };
+
+  const addAdditionalImportantDate = () => {
+    setAdditionalImportantDates((currentDates) => [...currentDates, { label: "", normalDate: "" }]);
+  };
+
+  const removeAdditionalImportantDate = (index: number) => {
+    setAdditionalImportantDates((currentDates) =>
+      currentDates.length === 1
+        ? [{ label: "", normalDate: "" }]
+        : currentDates.filter((_, currentIndex) => currentIndex !== index)
+    );
+  };
 
   const openStudentStatusDialog = (participant: Participant) => {
     if (!participant.isStudent) return;
@@ -680,6 +816,53 @@ export function Admin() {
                           placeholder="Bratislava, Slovakia"
                         />
                       </div>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <Label>Dôležité dátumy</Label>
+                            <p className="text-xs text-gray-500 mt-1">
+                              Pri vytvorení sa ukladá názov termínu aj pôvodný dátum `NormalDate`.
+                            </p>
+                          </div>
+                          <Button type="button" variant="outline" size="sm" onClick={addNewImportantDate}>
+                            <Plus className="w-4 h-4 mr-1" />
+                            Pridať dátum
+                          </Button>
+                        </div>
+                        <div className="space-y-2">
+                          {newImportantDates.map((importantDate, index) => (
+                            <div key={index} className="grid grid-cols-[1fr_180px_auto] items-end gap-2">
+                              <div className="space-y-2">
+                                <Label htmlFor={`important-date-create-label-${index}`}>Label</Label>
+                                <Input
+                                  id={`important-date-create-label-${index}`}
+                                  value={importantDate.label}
+                                  onChange={(e) => updateNewImportantDate(index, "label", e.target.value)}
+                                  placeholder="Uzávierka abstraktov"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor={`important-date-create-${index}`}>Normal date</Label>
+                                <Input
+                                  id={`important-date-create-${index}`}
+                                  type="date"
+                                  value={importantDate.normalDate}
+                                  onChange={(e) => updateNewImportantDate(index, "normalDate", e.target.value)}
+                                />
+                              </div>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                onClick={() => removeNewImportantDate(index)}
+                                aria-label="Odstrániť dátum"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                     <DialogFooter>
                       <Button variant="outline" onClick={() => setNewConferenceDialog(false)}>
@@ -710,12 +893,14 @@ export function Admin() {
                             {conf.participantsCount} účastníkov
                           </p>
                         </div>
-                        <div className="flex gap-2 flex-wrap sm:flex-nowrap">
+                            <div className="flex gap-2 flex-wrap sm:flex-nowrap">
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => {
                               setEditConference(conf);
+                              setEditImportantDates(mapImportantDatesToEditForm(conf.settings?.importantDates));
+                              setAdditionalImportantDates([{ label: "", normalDate: "" }]);
                               setEditConferenceDialog(true);
                             }}
                             className="gap-1"
@@ -1052,6 +1237,93 @@ export function Admin() {
                       }
                   />
                   <Label htmlFor="editActive">Aktívna konferencia</Label>
+                </div>
+                <div className="space-y-3 border-t pt-4">
+                  <div>
+                    <Label>Dôležité dátumy</Label>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Každý termín sa aktualizuje samostatne podľa svojho `id`, vrátane `label` a `updatedDate`.
+                    </p>
+                  </div>
+                  <div className="space-y-3">
+                    {editImportantDates.map((importantDate, index) => (
+                      <div key={importantDate.id || index} className="grid grid-cols-3 gap-2 items-end">
+                        <div className="space-y-2">
+                          <Label htmlFor={`important-date-edit-label-${index}`}>Label</Label>
+                          <Input
+                            id={`important-date-edit-label-${index}`}
+                            value={importantDate.label}
+                            onChange={(e) => updateEditImportantDate(index, "label", e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor={`important-date-edit-normal-${index}`}>Normal date</Label>
+                          <Input
+                            id={`important-date-edit-normal-${index}`}
+                            value={importantDate.normalDate}
+                            readOnly
+                            disabled
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor={`important-date-edit-updated-${index}`}>Updated date</Label>
+                          <Input
+                            id={`important-date-edit-updated-${index}`}
+                            type="date"
+                            value={importantDate.updatedDate}
+                            onChange={(e) => updateEditImportantDate(index, "updatedDate", e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-3 border-t pt-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <Label>Pridať nové termíny</Label>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Nové termíny sa k existujúcim settings doplnia s `label` aj `NormalDate`.
+                      </p>
+                    </div>
+                    <Button type="button" variant="outline" size="sm" onClick={addAdditionalImportantDate}>
+                      <Plus className="w-4 h-4 mr-1" />
+                      Pridať dátum
+                    </Button>
+                  </div>
+                  <div className="space-y-2">
+                    {additionalImportantDates.map((importantDate, index) => (
+                      <div key={index} className="grid grid-cols-[1fr_180px_auto] items-end gap-2">
+                        <div className="space-y-2">
+                          <Label htmlFor={`important-date-additional-label-${index}`}>Label</Label>
+                          <Input
+                            id={`important-date-additional-label-${index}`}
+                            value={importantDate.label}
+                            onChange={(e) => updateAdditionalImportantDate(index, "label", e.target.value)}
+                            placeholder="Early bird registrácia"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor={`important-date-additional-${index}`}>Normal date</Label>
+                          <Input
+                            id={`important-date-additional-${index}`}
+                            type="date"
+                            value={importantDate.normalDate}
+                            onChange={(e) => updateAdditionalImportantDate(index, "normalDate", e.target.value)}
+                          />
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          onClick={() => removeAdditionalImportantDate(index)}
+                          aria-label="Odstrániť nový termín"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
