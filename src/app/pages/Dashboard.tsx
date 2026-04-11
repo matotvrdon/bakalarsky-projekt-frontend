@@ -27,6 +27,7 @@ import {
   type SubmissionPayload,
 } from "../api/submissionApi.ts";
 import { toast } from "sonner";
+import { useActiveConference } from "../hooks/useActiveConference.ts";
 
 const STUDENT_VERIFICATION_FILE_TYPE = 0;
 const SUBMISSION_FILE_TYPE = 1;
@@ -51,14 +52,39 @@ const normalizeFileStatus = (value: number | string) => {
   return null;
 };
 
+const formatDate = (value?: string | null) => {
+  if (!value) return "";
+
+  const [year, month, day] = value.split("-");
+  if (!year || !month || !day) return value;
+
+  return `${day}.${month}.${year}`;
+};
+
+const formatDateRange = (startDate?: string | null, endDate?: string | null) => {
+  const start = formatDate(startDate);
+  const end = formatDate(endDate);
+
+  if (start && end) return `${start} - ${end}`;
+  return start || end || "";
+};
+
+const getFoodTypeLabel = (value: number) => {
+  if (value === 0) return "Raňajky";
+  if (value === 1) return "Obed";
+  if (value === 2) return "Večera";
+  return String(value);
+};
+
 export function Dashboard() {
   const navigate = useNavigate();
+  const activeConference = useActiveConference();
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [participationType, setParticipationType] = useState<string>("");
+  const [selectedConferenceEntryId, setSelectedConferenceEntryId] = useState<string>("");
   const [isStudent, setIsStudent] = useState(false);
   const [studentProofFile, setStudentProofFile] = useState<File | null>(null);
   const [participantDraft, setParticipantDraft] = useState<ParticipantPayload | null>(null);
-  const [savedRegistrationType, setSavedRegistrationType] = useState<ParticipantPayload["registrationType"]>(null);
+  const [savedConferenceEntryId, setSavedConferenceEntryId] = useState<ParticipantPayload["conferenceEntryId"]>(null);
   const [savedIsStudent, setSavedIsStudent] = useState(false);
   const [savingParticipant, setSavingParticipant] = useState(false);
   const [saveParticipantError, setSaveParticipantError] = useState("");
@@ -97,15 +123,9 @@ export function Dashboard() {
   const applyParticipantState = (participant: ParticipantPayload) => {
     setParticipantDraft(participant);
     localStorage.setItem("participantDraft", JSON.stringify(participant));
-    setParticipationType(
-      participant.registrationType === 1
-        ? "participantWithSubmission"
-        : participant.registrationType === 2
-          ? "participantWithoutSubmission"
-          : ""
-    );
+    setSelectedConferenceEntryId(participant.conferenceEntryId ? String(participant.conferenceEntryId) : "");
     setIsStudent(participant.isStudent);
-    setSavedRegistrationType(participant.registrationType);
+    setSavedConferenceEntryId(participant.conferenceEntryId);
     setSavedIsStudent(participant.isStudent);
   };
 
@@ -155,7 +175,8 @@ export function Dashboard() {
             phone: null,
             affiliation: null,
             country: null,
-            registrationType: null,
+            conferenceEntryId: null,
+            conferenceEntry: null,
             isStudent: false,
             isPresenting: false,
             fileManagers: [],
@@ -249,7 +270,7 @@ export function Dashboard() {
 
   const handleSaveParticipation = async () => {
     if (!participantDraft) return;
-    if (participantDraft.registrationType === null && !participantDraft.isStudent) {
+    if (participantDraft.conferenceEntryId === null && !participantDraft.isStudent) {
       setSaveParticipantError("Vyberte typ účasti alebo študentský status.");
       return;
     }
@@ -395,42 +416,56 @@ export function Dashboard() {
     }
   };
 
+  const conferenceEntryOptions = activeConference?.settings?.conferenceEntries ?? [];
+  const selectedConferenceEntry =
+    conferenceEntryOptions.find((conferenceEntry) => String(conferenceEntry.id) === selectedConferenceEntryId) ??
+    participantDraft?.conferenceEntry ??
+    null;
+
   useEffect(() => {
     if (!participantDraft) return;
-    const registrationType =
-      participationType === "participantWithSubmission"
-        ? 1
-        : participationType === "participantWithoutSubmission"
-          ? 2
-          : null;
 
-    updateDraft({ registrationType, isStudent });
-  }, [participationType, isStudent]);
+    updateDraft({
+      conferenceEntryId: selectedConferenceEntryId ? Number(selectedConferenceEntryId) : null,
+      conferenceEntry: selectedConferenceEntry,
+      isStudent
+    });
+  }, [selectedConferenceEntryId, selectedConferenceEntry, isStudent]);
 
-  const accommodationOptions = [
-    { id: 1, name: "Hotel Devín - Jednolôžková", price: 85 },
-    { id: 2, name: "Hotel Devín - Dvojlôžková", price: 120 },
-    { id: 3, name: "Hotel Marrol's - Jednolôžková", price: 95 },
-  ];
+  const accommodationOptions = activeConference?.settings?.bookingOptions ?? [];
+  const cateringOptions = activeConference?.settings?.foodOptions ?? [];
 
-  const cateringOptions = [
-    { id: 1, name: "Celodňové stravovanie (3 dni)", price: 120 },
-    { id: 2, name: "Obed + večera (3 dni)", price: 85 },
-    { id: 3, name: "Len obed (3 dni)", price: 45 },
-  ];
+  useEffect(() => {
+    if (!activeConference) return;
+    if (selectedConferenceEntryId && !conferenceEntryOptions.some((option) => String(option.id) === selectedConferenceEntryId)) {
+      setSelectedConferenceEntryId("");
+    }
+  }, [activeConference, selectedConferenceEntryId, conferenceEntryOptions]);
+
+  useEffect(() => {
+    if (accommodation && !accommodationOptions.some((option) => option.id === accommodation)) {
+      setAccommodation(null);
+    }
+  }, [accommodation, accommodationOptions]);
+
+  useEffect(() => {
+    setCatering((currentSelections) =>
+      currentSelections.filter((id) => cateringOptions.some((option) => option.id === id))
+    );
+  }, [cateringOptions]);
 
   const calculateTotal = () => {
     let total = 0;
     
     // Registration fee
-    if (participationType === "participantWithSubmission" || participationType === "participantWithoutSubmission") {
-      total += 100;
+    if (selectedConferenceEntry) {
+      total += selectedConferenceEntry.price;
     }
 
     // Accommodation
     if (accommodation) {
       const option = accommodationOptions.find(o => o.id === accommodation);
-      if (option) total += option.price * 3; // 3 nights
+      if (option) total += option.price;
     }
 
     // Catering
@@ -453,12 +488,7 @@ export function Dashboard() {
     alert("Faktúra sa sťahuje...");
   };
 
-  const participationTypeLabel =
-    savedRegistrationType === 1
-      ? "Účastník s príspevkom"
-      : savedRegistrationType === 2
-        ? "Účastník bez príspevku"
-        : "Nezvolený";
+  const conferenceEntryLabel = selectedConferenceEntry?.name || "Nezvolený";
 
   const studentVerificationFiles = (participantDraft?.fileManagers ?? [])
     .filter((file) => normalizeFileType(file.fileType) === STUDENT_VERIFICATION_FILE_TYPE)
@@ -467,6 +497,7 @@ export function Dashboard() {
   const studentVerificationStatus = studentVerificationFile
     ? normalizeFileStatus(studentVerificationFile.fileStatus)
     : null;
+  const selectedAccommodation = accommodationOptions.find((option) => option.id === accommodation) ?? null;
   const isStudentStatusLocked = Boolean(
     participantDraft?.isStudent &&
       studentVerificationFile &&
@@ -511,7 +542,7 @@ export function Dashboard() {
 
   const hasParticipationChanges = Boolean(
     participantDraft &&
-      (participantDraft.registrationType !== savedRegistrationType ||
+      (participantDraft.conferenceEntryId !== savedConferenceEntryId ||
         participantDraft.isStudent !== savedIsStudent)
   );
 
@@ -531,7 +562,7 @@ export function Dashboard() {
               <CardTitle className="text-sm font-medium text-gray-600">Účasť</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-base font-semibold">{participationTypeLabel}</div>
+              <div className="text-base font-semibold">{conferenceEntryLabel}</div>
             </CardContent>
           </Card>
 
@@ -582,49 +613,40 @@ export function Dashboard() {
           <TabsContent value="participation">
             <Card>
               <CardHeader>
-                <CardTitle>Typ účasti</CardTitle>
-                <CardDescription>Vyberte si typ vašej účasti na konferencii</CardDescription>
+                <CardTitle>Conference entry</CardTitle>
+                <CardDescription>Vyberte si typ vstupu dostupný pre aktívnu konferenciu</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <RadioGroup value={participationType} onValueChange={setParticipationType}>
-                  <Label 
-                    htmlFor="participantWithSubmission"
-                    className="flex items-center space-x-3 p-4 border rounded-lg hover:bg-gray-50 cursor-pointer"
-                  >
-                    <RadioGroupItem
-                      value="participantWithSubmission"
-                      id="participantWithSubmission"
-                      className="size-5 border-2 border-gray-500 data-[state=checked]:border-black"
-                    />
-                    <div className="flex-1">
-                      <div className="font-semibold">
-                        Účastník s príspevkom
-                      </div>
-                      <p className="text-sm text-gray-600">Účasť + vedecký príspevok</p>
-                    </div>
-                    <Badge variant="secondary">100 €</Badge>
-                  </Label>
+                {conferenceEntryOptions.length > 0 ? (
+                  <RadioGroup value={selectedConferenceEntryId} onValueChange={setSelectedConferenceEntryId}>
+                    {conferenceEntryOptions.map((conferenceEntry) => (
+                      <Label
+                        key={conferenceEntry.id}
+                        htmlFor={`conference-entry-${conferenceEntry.id}`}
+                        className="flex items-center space-x-3 p-4 border rounded-lg hover:bg-gray-50 cursor-pointer"
+                      >
+                        <RadioGroupItem
+                          value={String(conferenceEntry.id)}
+                          id={`conference-entry-${conferenceEntry.id}`}
+                          className="size-5 border-2 border-gray-500 data-[state=checked]:border-black"
+                        />
+                        <div className="flex-1">
+                          <div className="font-semibold">{conferenceEntry.name}</div>
+                        </div>
+                        <Badge variant="secondary">{conferenceEntry.price} €</Badge>
+                      </Label>
+                    ))}
+                  </RadioGroup>
+                ) : (
+                  <Alert>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      Pre aktívnu konferenciu zatiaľ nie sú nastavené žiadne conference entry možnosti.
+                    </AlertDescription>
+                  </Alert>
+                )}
 
-                  <Label 
-                    htmlFor="participantWithoutSubmission"
-                    className="flex items-center space-x-3 p-4 border rounded-lg hover:bg-gray-50 cursor-pointer"
-                  >
-                    <RadioGroupItem
-                      value="participantWithoutSubmission"
-                      id="participantWithoutSubmission"
-                      className="size-5 border-2 border-gray-500 data-[state=checked]:border-black"
-                    />
-                    <div className="flex-1">
-                      <div className="font-semibold">
-                        Účastník bez príspevku
-                      </div>
-                      <p className="text-sm text-gray-600">Účasť bez príspevku</p>
-                    </div>
-                    <Badge variant="secondary">100 €</Badge>
-                  </Label>
-                </RadioGroup>
-
-                {participationType && (
+                {selectedConferenceEntryId && (
                   <>
                     <div className="border-t border-gray-200" />
 
@@ -648,7 +670,7 @@ export function Dashboard() {
                             Som študent
                           </Label>
                         </div>
-                        <p className="text-sm text-gray-600">Študentská zľava 50% (50 € namiesto 100 €)</p>
+                        <p className="text-sm text-gray-600">Študentský status podlieha overeniu administrátorom.</p>
 
                         {isStudentStatusLocked && studentVerificationStatus === WAITING_FOR_APPROVAL_STATUS && (
                           <div className="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
@@ -764,13 +786,13 @@ export function Dashboard() {
               <CardHeader>
                 <CardTitle>Odoslanie príspevku</CardTitle>
                 <CardDescription>
-                  {participationType === "participantWithSubmission" 
+                  {selectedConferenceEntryId
                     ? "Vyplňte informácie o vašom príspevku"
-                    : "Dostupné len pre účastníkov"}
+                    : "Dostupné po výbere conference entry"}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {participationType === "participantWithSubmission" ? (
+                {selectedConferenceEntryId ? (
                   <>
                     {submissionLoading && (
                       <p className="text-sm text-gray-600">Načítavam príspevok...</p>
@@ -956,27 +978,37 @@ export function Dashboard() {
                     <Hotel className="w-5 h-5" />
                     Ubytovanie
                   </CardTitle>
-                  <CardDescription>Vyberte si ubytovanie počas konferencie (14-17 mája)</CardDescription>
+                  <CardDescription>Vyberte si ubytovanie dostupné pre aktívnu konferenciu</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <RadioGroup value={accommodation?.toString()} onValueChange={(val) => setAccommodation(parseInt(val))}>
-                    {accommodationOptions.map((option) => (
-                      <Label 
-                        key={option.id} 
-                        htmlFor={`accom-${option.id}`} 
-                        className="flex items-center space-x-3 p-4 border rounded-lg hover:bg-gray-50 cursor-pointer"
-                      >
-                        <RadioGroupItem value={option.id.toString()} id={`accom-${option.id}`} />
-                        <div className="flex-1">
-                          <div className="font-semibold">
-                            {option.name}
+                  {accommodationOptions.length > 0 ? (
+                    <RadioGroup value={accommodation?.toString()} onValueChange={(val) => setAccommodation(parseInt(val, 10))}>
+                      {accommodationOptions.map((option) => (
+                        <Label
+                          key={option.id}
+                          htmlFor={`accom-${option.id}`}
+                          className="flex items-start space-x-3 rounded-lg border p-4 hover:bg-gray-50 cursor-pointer"
+                        >
+                          <RadioGroupItem value={option.id.toString()} id={`accom-${option.id}`} className="mt-1" />
+                          <div className="flex-1">
+                            <div className="font-semibold">{option.name}</div>
+                            <p className="mt-1 text-sm text-gray-600">{option.description}</p>
+                            <p className="mt-1 text-xs text-gray-500">
+                              {formatDateRange(option.startDate, option.endDate)}
+                            </p>
                           </div>
-                          <p className="text-sm text-gray-600">3 noci (14-17 mája)</p>
-                        </div>
-                        <Badge variant="secondary">{option.price * 3} €</Badge>
-                      </Label>
-                    ))}
-                  </RadioGroup>
+                          <Badge variant="secondary">{option.price} €</Badge>
+                        </Label>
+                      ))}
+                    </RadioGroup>
+                  ) : (
+                    <Alert>
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        Pre túto konferenciu zatiaľ nie sú dostupné žiadne možnosti ubytovania.
+                      </AlertDescription>
+                    </Alert>
+                  )}
                 </CardContent>
               </Card>
 
@@ -989,31 +1021,45 @@ export function Dashboard() {
                   <CardDescription>Vyberte si stravovanie počas konferencie</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {cateringOptions.map((option) => (
-                    <Label 
-                      key={option.id} 
-                      htmlFor={`catering-${option.id}`} 
-                      className="flex items-center space-x-3 p-4 border rounded-lg hover:bg-gray-50 cursor-pointer"
-                    >
-                      <Checkbox 
-                        id={`catering-${option.id}`}
-                        checked={catering.includes(option.id)}
-                        onCheckedChange={(checked) => {
-                          if (checked) {
-                            setCatering([...catering, option.id]);
-                          } else {
-                            setCatering(catering.filter(id => id !== option.id));
-                          }
-                        }}
-                      />
-                      <div className="flex-1">
-                        <div className="font-semibold">
-                          {option.name}
+                  {cateringOptions.length > 0 ? (
+                    cateringOptions.map((option) => (
+                      <Label
+                        key={option.id}
+                        htmlFor={`catering-${option.id}`}
+                        className="flex items-start space-x-3 rounded-lg border p-4 hover:bg-gray-50 cursor-pointer"
+                      >
+                        <Checkbox
+                          id={`catering-${option.id}`}
+                          checked={catering.includes(option.id)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setCatering([...catering, option.id]);
+                            } else {
+                              setCatering(catering.filter(id => id !== option.id));
+                            }
+                          }}
+                          className="mt-1"
+                        />
+                        <div className="flex-1">
+                          <div className="font-semibold">{option.name}</div>
+                          <p className="mt-1 text-sm text-gray-600">{option.description}</p>
+                          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                            <span>{getFoodTypeLabel(option.foodOptionsType)}</span>
+                            <span>•</span>
+                            <span>{formatDate(option.date)}</span>
+                          </div>
                         </div>
-                      </div>
-                      <Badge variant="secondary">{option.price} €</Badge>
-                    </Label>
-                  ))}
+                        <Badge variant="secondary">{option.price} €</Badge>
+                      </Label>
+                    ))
+                  ) : (
+                    <Alert>
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        Pre túto konferenciu zatiaľ nie sú dostupné žiadne možnosti stravovania.
+                      </AlertDescription>
+                    </Alert>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -1157,26 +1203,27 @@ export function Dashboard() {
                   <div className="space-y-3">
                     <h3 className="font-semibold">Súhrn nákladov</h3>
                     <div className="space-y-2 text-sm">
-                      {participationType && (
+                      {selectedConferenceEntryId && (
                         <div className="flex justify-between py-2 border-b">
                           <span>
-                            Registračný poplatok ({participationType === "participantWithSubmission" ? "Účastník s príspevkom" : "Účastník bez príspevku"})
+                            Registračný poplatok ({conferenceEntryLabel})
                           </span>
                           <span className="font-semibold whitespace-nowrap">
-                            100 €
+                            {selectedConferenceEntry?.price ?? 0} €
                           </span>
                         </div>
                       )}
-                      {accommodation && (
+                      {selectedAccommodation && (
                         <div className="flex justify-between py-2 border-b">
-                          <span>Ubytovanie (3 noci)</span>
+                          <span className="break-words">{selectedAccommodation.name}</span>
                           <span className="font-semibold whitespace-nowrap">
-                            {accommodationOptions.find(o => o.id === accommodation)!.price * 3} €
+                            {selectedAccommodation.price} €
                           </span>
                         </div>
                       )}
                       {catering.map(id => {
-                        const option = cateringOptions.find(o => o.id === id)!;
+                        const option = cateringOptions.find(o => o.id === id);
+                        if (!option) return null;
                         return (
                           <div key={id} className="flex justify-between py-2 border-b gap-4">
                             <span className="break-words">{option.name}</span>
@@ -1204,7 +1251,7 @@ export function Dashboard() {
                       }} 
                       className="w-full" 
                       size="lg"
-                      disabled={!participationType || (invoiceType === "join-shared" && !joinCode)}
+                      disabled={!selectedConferenceEntryId || (invoiceType === "join-shared" && !joinCode)}
                     >
                       Vygenerovať faktúru
                     </Button>

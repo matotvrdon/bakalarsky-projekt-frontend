@@ -9,6 +9,7 @@ import { Label } from "../components/ui/label.tsx";
 import { getActiveConferences } from "../api/conferenceApi.ts";
 import {
   AuthApiError,
+  login as loginRequest,
   registerAccount,
   registerBasic,
   type RegisterAccountResponse,
@@ -16,6 +17,7 @@ import {
 } from "../api/authApi.ts";
 
 type RegistrationStep = "details" | "account" | "complete";
+type AccountMode = "create" | "existing";
 type DetailsField = "firstName" | "lastName" | "phone" | "affiliation" | "country" | "conferenceId";
 type AccountField = "email" | "password" | "confirmPassword" | "participantId";
 type FieldErrors = Partial<Record<DetailsField | AccountField, string>>;
@@ -31,6 +33,7 @@ const normalizeFieldKey = (field: string) => {
 export function Registration() {
   const navigate = useNavigate();
   const [step, setStep] = useState<RegistrationStep>("details");
+  const [accountMode, setAccountMode] = useState<AccountMode>("create");
   const [basicLoading, setBasicLoading] = useState(false);
   const [accountLoading, setAccountLoading] = useState(false);
   const [detailsError, setDetailsError] = useState("");
@@ -125,6 +128,7 @@ export function Registration() {
       });
 
       setBasicResult(response);
+      localStorage.setItem("pendingRegistrationParticipantId", String(response.participantId));
       setStep("account");
     } catch (error) {
       applyApiError(
@@ -149,12 +153,12 @@ export function Registration() {
     else if (!EMAIL_RE.test(formData.email.trim())) nextErrors.email = "Zadajte platný email.";
 
     if (!formData.password) nextErrors.password = "Heslo je povinné.";
-    else if (!PASSWORD_RE.test(formData.password)) {
+    else if (accountMode === "create" && !PASSWORD_RE.test(formData.password)) {
       nextErrors.password = "Heslo musí mať aspoň 8 znakov, veľké písmeno, malé písmeno a číslicu.";
     }
 
-    if (!formData.confirmPassword) nextErrors.confirmPassword = "Potvrdenie hesla je povinné.";
-    else if (formData.confirmPassword !== formData.password) {
+    if (accountMode === "create" && !formData.confirmPassword) nextErrors.confirmPassword = "Potvrdenie hesla je povinné.";
+    else if (accountMode === "create" && formData.confirmPassword !== formData.password) {
       nextErrors.confirmPassword = "Potvrdenie hesla sa musí zhodovať s heslom.";
     }
 
@@ -165,6 +169,33 @@ export function Registration() {
 
     setAccountLoading(true);
     try {
+      if (accountMode === "existing") {
+        const response = await loginRequest({
+          email: formData.email.trim(),
+          password: formData.password,
+          participantId: basicResult!.participantId,
+        });
+
+        const apiUser = response.user;
+        const roleValue = apiUser.role;
+        const roleNormalized =
+          typeof roleValue === "number"
+            ? (roleValue === 0 ? "admin" : "participant")
+            : (roleValue || "participant").toString().toLowerCase();
+
+        const user = {
+          id: apiUser.id,
+          email: apiUser.email,
+          role: roleNormalized,
+          name: apiUser.email.split("@")[0],
+        };
+
+        localStorage.setItem("currentUser", JSON.stringify(user));
+        localStorage.removeItem("pendingRegistrationParticipantId");
+        navigate(roleNormalized === "admin" ? "/admin" : "/dashboard");
+        return;
+      }
+
       const response = await registerAccount({
         participantId: basicResult!.participantId,
         email: formData.email.trim(),
@@ -173,8 +204,32 @@ export function Registration() {
       });
 
       setAccountResult(response);
+      localStorage.removeItem("pendingRegistrationParticipantId");
       setStep("complete");
     } catch (error) {
+      if (
+        accountMode === "existing" &&
+        error instanceof AuthApiError &&
+        error.status === 401
+      ) {
+        setAccountError("Nesprávny email alebo heslo.");
+        return;
+      }
+
+      if (
+        accountMode === "create" &&
+        error instanceof AuthApiError &&
+        error.code === "EMAIL_EXISTS"
+      ) {
+        setAccountMode("existing");
+        setAccountFieldErrors((current) => ({
+          ...current,
+          email: "Tento email už má účet. Prihláste sa existujúcim heslom."
+        }));
+        setAccountError("Účet s týmto emailom už existuje. Dokončite registráciu prihlásením.");
+        return;
+      }
+
       applyApiError(
         error,
         ["participantId", "email", "password", "confirmPassword"],
@@ -286,9 +341,35 @@ export function Registration() {
 
               <form onSubmit={handleAccountSubmit} className="space-y-6">
                 <div className="space-y-2">
-                  <h3 className="text-2xl font-semibold">Ďalší krok:</h3>
+                  <h3 className="text-2xl font-semibold">Ďalší krok</h3>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <Button
+                      type="button"
+                      variant={accountMode === "create" ? "default" : "outline"}
+                      onClick={() => {
+                        setAccountMode("create");
+                        setAccountError("");
+                        setAccountFieldErrors({});
+                      }}
+                    >
+                      Vytvoriť účet
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={accountMode === "existing" ? "default" : "outline"}
+                      onClick={() => {
+                        setAccountMode("existing");
+                        setAccountError("");
+                        setAccountFieldErrors({});
+                      }}
+                    >
+                      Účet už mám
+                    </Button>
+                  </div>
                   <p className="text-gray-600">
-                    Vytvorte si účet s emailom a heslom pre prihlásenie do systému.
+                    {accountMode === "create"
+                      ? "Vytvorte si účet s emailom a heslom pre prihlásenie do systému."
+                      : "Prihláste sa existujúcim účtom a participant sa priradí k aktuálnej konferencii."}
                   </p>
                 </div>
 
@@ -319,22 +400,26 @@ export function Registration() {
                     {renderFieldError(accountFieldErrors.password)}
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="confirmPassword">Potvrdenie hesla *</Label>
-                    <Input
-                      id="confirmPassword"
-                      type="password"
-                      value={formData.confirmPassword}
-                      onChange={(e) => handleChange("confirmPassword", e.target.value)}
-                      aria-invalid={Boolean(accountFieldErrors.confirmPassword)}
-                      required
-                    />
-                    {renderFieldError(accountFieldErrors.confirmPassword)}
-                  </div>
+                  {accountMode === "create" && (
+                    <div className="space-y-2">
+                      <Label htmlFor="confirmPassword">Potvrdenie hesla *</Label>
+                      <Input
+                        id="confirmPassword"
+                        type="password"
+                        value={formData.confirmPassword}
+                        onChange={(e) => handleChange("confirmPassword", e.target.value)}
+                        aria-invalid={Boolean(accountFieldErrors.confirmPassword)}
+                        required
+                      />
+                      {renderFieldError(accountFieldErrors.confirmPassword)}
+                    </div>
+                  )}
                 </div>
 
                 <Button type="submit" className="w-full" size="lg" disabled={accountLoading}>
-                  {accountLoading ? "Vytváram účet..." : "Vytvoriť účet"}
+                  {accountLoading
+                    ? accountMode === "create" ? "Vytváram účet..." : "Prihlasujem..."
+                    : accountMode === "create" ? "Vytvoriť účet" : "Prihlásiť sa a pokračovať"}
                 </Button>
               </form>
             </CardContent>
@@ -436,12 +521,12 @@ export function Registration() {
                 </div>
               </div>
 
-              <Alert className="border-blue-200 bg-blue-50">
-                <AlertCircle className="h-4 w-4 text-blue-600" />
-                <AlertDescription className="text-blue-900 text-sm">
-                  V ďalšom kroku vytvoríte účet s emailom a heslom pre prihlásenie do systému.
-                </AlertDescription>
-              </Alert>
+            <Alert className="border-blue-200 bg-blue-50">
+              <AlertCircle className="h-4 w-4 text-blue-600" />
+              <AlertDescription className="text-blue-900 text-sm">
+                  V ďalšom kroku si vytvoríte nový účet alebo sa prihlásite do existujúceho.
+              </AlertDescription>
+            </Alert>
 
               <Button type="submit" className="w-full" size="lg" disabled={basicLoading}>
                 {basicLoading ? "Pokračujem..." : "Pokračovať"}

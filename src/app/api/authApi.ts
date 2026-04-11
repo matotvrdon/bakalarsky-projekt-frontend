@@ -35,6 +35,7 @@ export type RegisterAccountResponse = {
 export type LoginRequest = {
   email: string;
   password: string;
+  participantId?: number;
 };
 
 export type LoginUser = {
@@ -144,7 +145,4 @@ export const registerAccount = (data: RegisterAccountPayload) =>
   postAuth<RegisterAccountResponse>("/api/auth/register-account", data);
 
 export const login = (data: LoginRequest) =>
-  api<LoginResponse>("/api/auth/login", {
-    method: "POST",
-    json: data
-  });
+  postAuth<LoginResponse>("/api/auth/login", data);

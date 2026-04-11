@@ -29,9 +29,11 @@ export function Root() {
     { name: "Komisie", href: "/committees" },
     { name: "Program", href: "/schedule" },
     { name: "Príspevky", href: "/submissions" },
-    { name: "Prednášajúci", href: "/speakers" },
     { name: "Registrácia", href: "/register" },
   ];
+  const visibleNavigation = currentUser
+    ? navigation.filter((item) => item.href !== "/register")
+    : navigation;
 
   const isActive = (href: string) => {
     if (href === "/") return location.pathname === "/";
@@ -57,7 +59,7 @@ export function Root() {
 
             {/* Desktop Navigation */}
             <nav className="hidden md:flex items-center gap-6">
-              {navigation.map((item) => (
+              {visibleNavigation.map((item) => (
                 <Link
                   key={item.href}
                   to={item.href}
@@ -111,7 +113,7 @@ export function Root() {
         {mobileMenuOpen && (
           <div className="md:hidden border-t bg-white">
             <nav className="container mx-auto px-4 py-4 space-y-1">
-              {navigation.map((item) => (
+              {visibleNavigation.map((item) => (
                 <Link
                   key={item.href}
                   to={item.href}

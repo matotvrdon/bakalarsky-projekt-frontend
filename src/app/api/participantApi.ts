@@ -1,4 +1,5 @@
 import { api } from "./baseApi";
+import type { ConferenceEntry } from "./conferenceApi.ts";
 
 export type FileTypeValue = 0 | 1 | "StudentVerification" | "Submission";
 export type FileStatusValue = 0 | 1 | 2 | "WaitingForApproval" | "Approved" | "Rejected";
@@ -23,7 +24,8 @@ export type ParticipantPayload = {
   phone?: string | null;
   affiliation?: string | null;
   country?: string | null;
-  registrationType: number | null;
+  conferenceEntryId: number | null;
+  conferenceEntry?: ConferenceEntry | null;
   isStudent: boolean;
   isPresenting?: boolean | null;
   fileManagers: FileManagerPayload[];

@@ -21,7 +21,13 @@ export function Login() {
     setLoading(true);
 
     try {
-      const response = await loginRequest({ email, password });
+      const pendingParticipantIdRaw = localStorage.getItem("pendingRegistrationParticipantId");
+      const pendingParticipantId = pendingParticipantIdRaw ? Number(pendingParticipantIdRaw) : undefined;
+      const response = await loginRequest({
+        email,
+        password,
+        participantId: Number.isFinite(pendingParticipantId) ? pendingParticipantId : undefined,
+      });
       const apiUser = response.user;
       const roleValue = apiUser.role;
       const roleNormalized =
@@ -37,6 +43,7 @@ export function Login() {
       };
 
       localStorage.setItem("currentUser", JSON.stringify(user));
+      localStorage.removeItem("pendingRegistrationParticipantId");
       navigate(roleNormalized === "admin" ? "/admin" : "/dashboard");
     } catch (err) {
       setError("Nesprávny email alebo heslo");

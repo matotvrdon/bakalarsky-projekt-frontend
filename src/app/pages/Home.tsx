@@ -72,9 +72,9 @@ const getDateStatusLabel = (importantDate: ImportantDate) => {
 };
 
 const getDateStatusClassName = (importantDate: ImportantDate) => {
-  if (importantDate.importantDatesStatus === "Extended") return "bg-emerald-400/12 text-emerald-50 border border-emerald-200/20";
-  if (importantDate.importantDatesStatus === "Shortened") return "bg-amber-300/14 text-amber-50 border border-amber-200/20";
-  return "bg-white/8 text-white/88 border border-white/10";
+  if (importantDate.importantDatesStatus === "Extended") return "bg-emerald-500/30 text-emerald-100 border border-emerald-400/50";
+  if (importantDate.importantDatesStatus === "Shortened") return "bg-amber-500/30 text-amber-100 border border-amber-400/50";
+  return "bg-blue-500/20 text-blue-100 border border-blue-400/40";
 };
 
 const getDateCardClassName = (importantDate: ImportantDate) => {
@@ -133,40 +133,45 @@ export function Home() {
                 {importantDates.map((importantDate) => (
                   <div
                     key={`${importantDate.label}-${importantDate.normalDate}-${importantDate.updatedDate ?? "normal"}`}
-                    className={`group rounded-2xl p-5 md:p-6 transition-all duration-300 backdrop-blur-sm border ${
+                    className={`group relative overflow-hidden rounded-xl transition-all duration-300 backdrop-blur-sm border ${
                       importantDate.importantDatesStatus === "Extended"
-                        ? "border-emerald-400/30 bg-gradient-to-br from-emerald-400/12 to-emerald-500/6"
+                        ? "border-emerald-400/40 bg-gradient-to-br from-emerald-500/20 via-emerald-400/10 to-emerald-500/5 hover:from-emerald-500/25 hover:via-emerald-400/15"
                         : importantDate.importantDatesStatus === "Shortened"
-                          ? "border-amber-300/30 bg-gradient-to-br from-amber-300/12 to-amber-400/6"
-                          : "border-white/20 bg-gradient-to-br from-white/12 to-white/6"
-                    }`}
+                          ? "border-amber-400/40 bg-gradient-to-br from-amber-500/20 via-amber-400/10 to-amber-500/5 hover:from-amber-500/25 hover:via-amber-400/15"
+                          : "border-blue-400/30 bg-gradient-to-br from-blue-500/15 via-blue-400/8 to-blue-500/4 hover:from-blue-500/20 hover:via-blue-400/12"
+                    } shadow-lg hover:shadow-xl`}
                   >
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-                      <div className="min-w-fit">
-                        {isDateUpdated(importantDate) ? (
-                          <div className="space-y-1">
-                            <div className="text-xs font-medium text-white/40 line-through decoration-white/30">
+                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+                    <div className="relative p-4 md:p-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                      <div className="flex-shrink-0">
+                        <div className="space-y-1">
+                          {isDateUpdated(importantDate) && (
+                            <div className="text-xs font-medium text-white/45 line-through decoration-white/25">
                               {formatDate(importantDate.normalDate)}
                             </div>
-                            <div className="text-xl md:text-2xl font-bold text-white tracking-tight">
-                              {formatDate(importantDate.updatedDate)}
-                            </div>
+                          )}
+                          <div className={`font-black tracking-tight ${
+                            isDateUpdated(importantDate)
+                              ? "text-lg md:text-xl text-white"
+                              : "text-2xl md:text-3xl text-white"
+                          }`}>
+                            {formatDate(importantDate.updatedDate || importantDate.normalDate)}
                           </div>
-                        ) : (
-                          <div className="text-xl md:text-2xl font-bold text-white tracking-tight">
-                            {formatDate(importantDate.normalDate)}
-                          </div>
-                        )}
+                        </div>
                       </div>
                       <div className="flex min-w-0 flex-col gap-2">
-                        <p className="text-sm md:text-base font-semibold leading-tight text-white/95">
+                        <p className={`leading-tight text-white/95 ${
+                          isDateUpdated(importantDate)
+                            ? "text-xs md:text-sm font-bold"
+                            : "text-sm md:text-base font-semibold"
+                        }`}>
                           {importantDate.label || "Názov termínu"}
                         </p>
                         {getDateStatusLabel(importantDate) && (
                           <span
-                            className={`inline-flex w-fit rounded-full px-2.5 py-1 text-xs font-bold tracking-wide ${getDateStatusClassName(
+                            className={`inline-flex w-fit rounded-lg px-2 py-0.5 text-xs font-bold tracking-wider uppercase ${getDateStatusClassName(
                               importantDate
-                            )}`}
+                            )} shadow-md`}
                           >
                             {getDateStatusLabel(importantDate)}
                           </span>
