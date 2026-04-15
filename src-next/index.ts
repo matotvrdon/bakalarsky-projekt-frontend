@@ -1,0 +1,13 @@
+export { default as AppNext } from "./app/App";
+export * from "./app/routes";
+export * from "./shared/ui";
+export * from "./shared/api";
+export * from "./shared/hooks";
+export * from "./shared/lib";
+export * from "./features/shared/components";
+export * from "./features/dashboard/components";
+export * from "./features/admin/components";
+export * from "./features/public/pages";
+export * from "./features/auth/pages";
+export * from "./features/legacy/pages";
+export * from "./features/misc/pages";

@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build"
+    "build": "vite build",
+    "dev:next": "vite --config vite.next.config.ts",
+    "build:next": "vite build --config vite.next.config.ts"
   },
   "dependencies": {
     "@emotion/react": "11.14.0",
