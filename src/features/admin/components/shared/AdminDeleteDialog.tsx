@@ -1,0 +1,1 @@
+export { AdminDeleteDialog } from "../base/index.ts";

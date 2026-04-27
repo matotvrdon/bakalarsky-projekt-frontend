@@ -205,6 +205,16 @@ export type BookingOptionsSettingsPayload = {
   bookingOptions: BookingOptionCreatePayload[];
 };
 
+export const getActiveConference = async () => {
+  const response = await fetch(`${BASE_URL}/api/conference/active`);
+
+  if (!response.ok) {
+    throw new Error("Failed to load active conference");
+  }
+
+  return response.json();
+};
+
 export const getAllConferences = () =>
   api<Conference[]>("/api/conference");
 
