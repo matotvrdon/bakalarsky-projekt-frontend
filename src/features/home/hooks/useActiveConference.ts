@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import {
     getActiveConference,
     type ConferenceSettings,
-} from "../../../app/api/conferenceApi.ts";
+} from "../../../api/conferenceApi.ts";
 
 export type ActiveConference = {
     id: number;

@@ -9,7 +9,7 @@ import {
     PublicLabel,
 } from "../base/index.ts";
 
-import { FileInfoCard } from "../FileInfoCard.tsx";
+import { FileInfoCard } from "../files/index.ts";
 import { StudentProofUploadBox } from "./StudentProofUploadBox.tsx";
 import { StudentStatusAlert } from "./StudentStatusAlert.tsx";
 
@@ -20,6 +20,8 @@ type StudentStatusSectionProps = {
 export function StudentStatusSection({
                                          dashboard,
                                      }: StudentStatusSectionProps) {
+    const locked = dashboard.invoiceGenerated;
+
     return (
         <div className="space-y-3">
             <PublicLabel className="text-base">
@@ -27,12 +29,17 @@ export function StudentStatusSection({
             </PublicLabel>
 
             <div className="space-y-3 rounded-xl border border-gray-200 bg-gray-50 p-4">
-                <label className="flex items-center gap-2">
+                <label
+                    className={[
+                        "flex items-center gap-2",
+                        locked ? "cursor-not-allowed opacity-60" : "",
+                    ].join(" ")}
+                >
                     <input
                         id="studentStatusDashboard"
                         type="checkbox"
                         checked={dashboard.isStudent}
-                        disabled={dashboard.isStudentStatusLocked}
+                        disabled={locked || dashboard.isStudentStatusLocked}
                         onChange={(event) =>
                             dashboard.setIsStudent(event.target.checked)
                         }
@@ -47,6 +54,13 @@ export function StudentStatusSection({
                 <p className="text-sm text-gray-600">
                     Študentský status podlieha overeniu administrátorom.
                 </p>
+
+                {locked ? (
+                    <PublicAlert variant="warning">
+                        Účasť je uzamknutá, pretože faktúra už bola
+                        vygenerovaná.
+                    </PublicAlert>
+                ) : null}
 
                 <StudentStatusAlert
                     isStudentStatusLocked={dashboard.isStudentStatusLocked}
@@ -79,7 +93,9 @@ export function StudentStatusSection({
                     />
                 ) : null}
 
-                <StudentProofUploadBox dashboard={dashboard} />
+                {!locked ? (
+                    <StudentProofUploadBox dashboard={dashboard} />
+                ) : null}
             </div>
 
             {dashboard.studentUploadError ? (

@@ -8,7 +8,7 @@ import {
     updateSubmissionSettingsByConference,
     type SubmissionSettings,
     type SubmissionSettingsUpdateRequest,
-} from "../../../../app/api/submissionSettingsApi.ts";
+} from "../../../../api/submissionSettingsApi.ts";
 
 import type { Conference } from "../../types/adminTypes.ts";
 

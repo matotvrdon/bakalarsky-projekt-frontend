@@ -5,14 +5,17 @@ import type {
     Conference,
     ConferenceEntry,
     FoodOption,
-} from "../../../app/api/conferenceApi.ts";
+} from "../../../api/conferenceApi.ts";
+
+import type { Supplier } from "../../../api/supplierApi.ts";
 
 import type {
     FileManagerPayload,
     ParticipantPayload,
-} from "../../../app/api/participantApi.ts";
+} from "../../../api/participantApi.ts";
 
-import type { SubmissionPayload } from "../../../app/api/submissionApi.ts";
+import type { SubmissionPayload } from "../../../api/submissionApi.ts";
+import type { Invoice } from "../../../api/invoiceApi.ts";
 
 export type CurrentUser = {
     id: number;
@@ -23,16 +26,38 @@ export type CurrentUser = {
     conferenceId?: number;
 };
 
-export type PublicTabValue = "participation" | "submission" | "services" | "invoice";
+export type PublicTabValue =
+    | "participation"
+    | "submission"
+    | "services"
+    | "invoice";
 
-export type InvoiceType = "individual" | "create-shared" | "join-shared";
-export type InvoiceStatus = "pending" | "paid";
+export type InvoiceType =
+    | "individual"
+    | "create-shared"
+    | "join-shared";
+
+export type InvoiceStatus =
+    | "pending"
+    | "paid";
+
+export type InvoiceCustomerType =
+    | "person"
+    | "company";
 
 export type BillingInfo = {
+    customerType: InvoiceCustomerType;
+    customerName: string;
     companyName: string;
+
+    street: string;
+    postalCode: string;
+    city: string;
+    country: string;
+
     ico: string;
     dic: string;
-    address: string;
+    vatId: string;
 };
 
 export type SubmissionForm = {
@@ -41,7 +66,10 @@ export type SubmissionForm = {
 };
 
 export type SubmissionFieldErrors = Partial<
-    Record<"submissionIdentifier" | "title" | "participantId" | "conferenceId", string>
+    Record<
+        "submissionIdentifier" | "title" | "participantId" | "conferenceId",
+        string
+    >
 >;
 
 export type PublicSummary = {
@@ -50,11 +78,14 @@ export type PublicSummary = {
     submissionStatusLabel: string;
 };
 
-export type PublicDashboardState = {
+export type PublicAuthState = {
     currentUser: CurrentUser | null;
     activeConference: Conference | null;
+};
 
+export type PublicParticipationState = {
     participantDraft: ParticipantPayload | null;
+
     selectedConferenceEntryId: string;
     selectedConferenceEntry: ConferenceEntry | null;
     conferenceEntryOptions: ConferenceEntry[];
@@ -66,19 +97,33 @@ export type PublicDashboardState = {
     studentVerificationFileName: string;
     studentVerificationStatus: number | null;
     savedIsStudent: boolean;
+
     savingParticipant: boolean;
     uploadingStudentProof: boolean;
     saveParticipantError: string;
     studentUploadError: string;
     hasParticipationChanges: boolean;
+};
 
+export type PublicParticipationActions = {
+    setSelectedConferenceEntryId: (value: string) => void;
+    setIsStudent: (value: boolean) => void;
+    setStudentProofFile: (file: File | null) => void;
+
+    handleSaveParticipation: () => Promise<void>;
+    handleUploadStudentProof: () => Promise<void>;
+};
+
+export type PublicSubmissionState = {
     willPresent: boolean;
     presentationFile: File | null;
+
     submissionRecord: SubmissionPayload | null;
     submission: SubmissionForm;
     submissionLoading: boolean;
     savingSubmission: boolean;
     uploadingPresentation: boolean;
+
     saveSubmissionError: string;
     submissionFieldErrors: SubmissionFieldErrors;
     submissionSuccessMessage: string;
@@ -87,13 +132,34 @@ export type PublicDashboardState = {
     latestSubmissionFileName: string;
     latestSubmissionFileStatus: number | null;
     isSubmissionStatusLocked: boolean;
+};
 
+export type PublicSubmissionActions = {
+    setWillPresent: (value: boolean) => void;
+    setPresentationFile: (file: File | null) => void;
+    setSubmission: (value: SubmissionForm) => void;
+
+    handleSaveSubmission: () => Promise<void>;
+    handleUploadSubmissionFile: () => Promise<void>;
+};
+
+export type PublicServicesState = {
     accommodation: number | null;
     accommodationOptions: BookingOption[];
     selectedAccommodation: BookingOption | null;
+
     catering: number[];
     cateringOptions: FoodOption[];
 
+    total: number;
+};
+
+export type PublicServicesActions = {
+    setAccommodation: (value: number | null) => void;
+    setCatering: (value: number[]) => void;
+};
+
+export type PublicInvoiceState = {
     invoiceGenerated: boolean;
     invoiceStatus: InvoiceStatus;
     invoiceType: InvoiceType;
@@ -102,36 +168,43 @@ export type PublicDashboardState = {
     hasCustomBilling: boolean;
     billingInfo: BillingInfo;
 
-    summary: PublicSummary;
-    total: number;
+    invoice: Invoice | null;
+    invoiceLoading: boolean;
+    invoiceError: string;
+
+    supplier: Supplier | null;
+    supplierLoading: boolean;
 };
 
-export type PublicDashboardActions = {
-    setSelectedConferenceEntryId: (value: string) => void;
-    setIsStudent: (value: boolean) => void;
-    setStudentProofFile: (file: File | null) => void;
-    setWillPresent: (value: boolean) => void;
-    setPresentationFile: (file: File | null) => void;
-    setSubmission: (value: SubmissionForm) => void;
-    setAccommodation: (value: number | null) => void;
-    setCatering: (value: number[]) => void;
+export type PublicInvoiceActions = {
     setInvoiceType: (value: InvoiceType) => void;
     setJoinCode: (value: string) => void;
     setHasCustomBilling: (value: boolean) => void;
     setBillingInfo: (value: BillingInfo) => void;
 
-    handleSaveParticipation: () => Promise<void>;
-    handleUploadStudentProof: () => Promise<void>;
-    handleSaveSubmission: () => Promise<void>;
-    handleUploadSubmissionFile: () => Promise<void>;
-    handleGenerateInvoice: () => void;
-    handleDownloadInvoice: () => void;
+    handleGenerateInvoice: () => Promise<void>;
+    handleDownloadInvoice: () => Promise<void>;
     copySharedInvoiceCode: () => Promise<void>;
+};
+
+export type PublicFileActions = {
     getFileViewUrl: (fileManagerId: number) => string;
     getFileDownloadUrl: (fileManagerId: number) => string;
 };
 
-export type PublicDashboardContext = PublicDashboardState & PublicDashboardActions;
+export type PublicDashboardContext =
+    PublicAuthState &
+    PublicParticipationState &
+    PublicParticipationActions &
+    PublicSubmissionState &
+    PublicSubmissionActions &
+    PublicServicesState &
+    PublicServicesActions &
+    PublicInvoiceState &
+    PublicInvoiceActions &
+    PublicFileActions & {
+    summary: PublicSummary;
+};
 
 export type PublicTabItem = {
     value: PublicTabValue;

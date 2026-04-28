@@ -7,7 +7,7 @@ import {
     deleteConferenceFoodOption,
     updateConferenceFoodOption,
     type FoodOptionType,
-} from "../../../../app/api/conferenceApi.ts";
+} from "../../../../api/conferenceApi.ts";
 
 import type {
     Conference,

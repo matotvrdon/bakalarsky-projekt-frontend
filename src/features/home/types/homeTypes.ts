@@ -1,4 +1,4 @@
-import type { ImportantDate } from "../../../app/api/conferenceApi.ts";
+import type { ImportantDate } from "../../../api/conferenceApi.ts";
 
 export type HomeImportantDate = Omit<ImportantDate, "importantDatesStatus"> & {
     importantDatesStatus: "Normal" | "Extended" | "Shortened" | 0 | 1 | 2;

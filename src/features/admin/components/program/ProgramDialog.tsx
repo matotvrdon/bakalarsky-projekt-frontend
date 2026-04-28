@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import {
     replaceConferenceProgram,
     type ProgramItemType,
-} from "../../../../app/api/conferenceApi.ts";
+} from "../../../../api/conferenceApi.ts";
 
 import type {
     Conference,

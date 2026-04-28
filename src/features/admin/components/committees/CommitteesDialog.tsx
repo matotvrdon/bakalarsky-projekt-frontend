@@ -13,7 +13,7 @@ import {
     updateCommittee,
     updateCommitteeMember,
     updateCommitteeRole,
-} from "../../../../app/api/committeeApi.ts";
+} from "../../../../api/committeeApi.ts";
 
 import type {
     CommitteeForm,

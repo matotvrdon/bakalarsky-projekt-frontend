@@ -2,16 +2,16 @@ import type {
     Committee,
     CommitteeMember,
     CommitteeRole,
-} from "../../../app/api/committeeApi.ts";
+} from "../../../api/committeeApi.ts";
 
 import type {
     ConferenceEntry,
     ConferenceSettings,
     FoodOptionType,
     ProgramItemType,
-} from "../../../app/api/conferenceApi.ts";
+} from "../../../api/conferenceApi.ts";
 
-import type { FileManagerPayload } from "../../../app/api/participantApi.ts";
+import type { FileManagerPayload } from "../../../api/participantApi.ts";
 
 export type { FoodOptionType, ProgramItemType };
 
@@ -108,22 +108,58 @@ export type ProgramDayForm = {
     items: ProgramItemForm[];
 };
 
+export type ParticipantInvoiceStatus =
+    | "pending"
+    | "paid"
+    | "cancelled"
+    | "none";
+
+export type AdminVerificationStatus =
+    | "not-selected"
+    | "selected-no-file"
+    | "waiting"
+    | "approved"
+    | "rejected";
+
+export type ParticipantReviewKind = "student" | "submission";
+
 export type Participant = {
     id: number;
+
     firstName: string;
     lastName: string;
+    fullName: string;
+
     conferenceEntryId: number | null;
     conferenceEntry?: ConferenceEntry | null;
+
     isStudent: boolean;
     isPresenting?: boolean | null;
+
     fileManagers: FileManagerPayload[];
+
+    latestStudentFile: FileManagerPayload | null;
+    latestSubmissionFile: FileManagerPayload | null;
+
     email: string;
     phone: string;
     affiliation: string;
     country: string;
+
     type: string;
+    participationTypeLabel: string;
+
     registrationDate: string;
-    invoiceStatus?: "pending" | "paid" | "none";
+
+    studentStatus: AdminVerificationStatus;
+    studentStatusLabel: string;
+
+    submissionStatus: AdminVerificationStatus;
+    submissionStatusLabel: string;
+
+    invoiceStatus: ParticipantInvoiceStatus;
+    invoiceStatusLabel: string;
+    invoiceNumber?: string | null;
 };
 
 export type Invoice = {

@@ -6,7 +6,7 @@ import {
     deleteConference,
     getAllConferences,
     updateConference,
-} from "../../../app/api/conferenceApi.ts";
+} from "../../../api/conferenceApi.ts";
 
 import type { Conference } from "../types/adminTypes.ts";
 

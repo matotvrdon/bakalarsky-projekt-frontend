@@ -3,4 +3,4 @@ export type {
     CommitteeMember,
     CommitteeRole,
     ConferenceCommittees,
-} from "../../../app/api/committeeApi.ts";
+} from "../../../api/committeeApi.ts";

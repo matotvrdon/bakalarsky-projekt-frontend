@@ -5,6 +5,7 @@ import type { Conference } from "../features/admin/types/adminTypes.ts";
 
 import { useAdminAuth } from "../features/admin/hooks/useAdminAuth.ts";
 import { useConferences } from "../features/admin/hooks/useConferences.ts";
+import { useInvoices } from "../features/admin/hooks/useInvoices.ts";
 import { useParticipants } from "../features/admin/hooks/useParticipants.ts";
 
 import { AdminHeader } from "../features/admin/components/AdminHeader.tsx";
@@ -13,8 +14,10 @@ import {
     type AdminTabItem,
 } from "../features/admin/components/base/index.ts";
 
-import { ConferencesTab } from "../features/admin/components/conferences/ConferencesTab.tsx";
 import { CommitteesDialog } from "../features/admin/components/committees/index.ts";
+import { ConferencesTab } from "../features/admin/components/conferences/ConferencesTab.tsx";
+import { InvoicesTab } from "../features/admin/components/invoices/index.ts";
+import { ParticipantsTab } from "../features/admin/components/participants/index.ts";
 
 const adminTabs: AdminTabItem[] = [
     {
@@ -48,7 +51,20 @@ export function Admin() {
         deleteConferenceHandler,
     } = useConferences();
 
-    const { participants } = useParticipants();
+    const {
+        participants,
+        participantsLoading,
+        participantsError,
+        loadParticipants,
+    } = useParticipants();
+
+    const {
+        invoices,
+        invoicesLoading,
+        invoicesError,
+        loadInvoices,
+        updateInvoiceStatusHandler,
+    } = useInvoices();
 
     const [activeTab, setActiveTab] = useState("conferences");
 
@@ -94,27 +110,23 @@ export function Admin() {
                     )}
 
                     {activeTab === "participants" && (
-                        <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-                            <h2 className="text-xl font-semibold text-gray-900">
-                                Účastníci
-                            </h2>
-
-                            <p className="mt-2 text-sm text-gray-600">
-                                Načítaných účastníkov: {participants.length}
-                            </p>
-                        </div>
+                        <ParticipantsTab
+                            participants={participants}
+                            loading={participantsLoading}
+                            error={participantsError}
+                            reviewerEmail={currentUser.email}
+                            onReload={loadParticipants}
+                        />
                     )}
 
                     {activeTab === "invoices" && (
-                        <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-                            <h2 className="text-xl font-semibold text-gray-900">
-                                Faktúry
-                            </h2>
-
-                            <p className="mt-2 text-sm text-gray-600">
-                                Faktúry doplníme v ďalšom kroku.
-                            </p>
-                        </div>
+                        <InvoicesTab
+                            invoices={invoices}
+                            loading={invoicesLoading}
+                            error={invoicesError}
+                            onReload={loadInvoices}
+                            onUpdateStatus={updateInvoiceStatusHandler}
+                        />
                     )}
                 </div>
             </div>

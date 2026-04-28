@@ -1,4 +1,4 @@
-import { BASE_URL } from "../../../app/api/baseApi.ts";
+import { BASE_URL } from "../../../api/baseApi.ts";
 
 import {
     APPROVED_STATUS,
@@ -8,8 +8,8 @@ import {
     WAITING_FOR_APPROVAL_STATUS,
 } from "../constants/publicConstants.ts";
 
-import type { FoodOptionType } from "../../../app/api/conferenceApi.ts";
-import type { FileManagerPayload } from "../../../app/api/participantApi.ts";
+import type { FoodOptionType } from "../../../api/conferenceApi.ts";
+import type { FileManagerPayload } from "../../../api/participantApi.ts";
 
 export const normalizeFileType = (value: number | string) => {
     if (typeof value === "number") {

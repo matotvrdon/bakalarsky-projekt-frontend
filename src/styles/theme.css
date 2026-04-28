@@ -2,8 +2,6 @@
 
 :root {
   --font-size: 16px;
-  --font-display: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
-  --font-sans: "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
   --background: #ffffff;
   --foreground: oklch(0.145 0 0);
   --card: #ffffff;
@@ -128,8 +126,6 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: var(--font-sans);
-    text-rendering: optimizeLegibility;
   }
 
   /**
@@ -145,28 +141,24 @@
     font-size: var(--text-2xl);
     font-weight: var(--font-weight-medium);
     line-height: 1.5;
-    font-family: var(--font-display);
   }
 
   h2 {
     font-size: var(--text-xl);
     font-weight: var(--font-weight-medium);
     line-height: 1.5;
-    font-family: var(--font-display);
   }
 
   h3 {
     font-size: var(--text-lg);
     font-weight: var(--font-weight-medium);
     line-height: 1.5;
-    font-family: var(--font-display);
   }
 
   h4 {
     font-size: var(--text-base);
     font-weight: var(--font-weight-medium);
     line-height: 1.5;
-    font-family: var(--font-display);
   }
 
   label {

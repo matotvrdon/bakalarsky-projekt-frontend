@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 import { useActiveConference } from "../features/schedule/hooks/useActiveConference.ts";
-import { downloadConferenceProgramPdf } from "../app/api/conferenceApi.ts";
+import { downloadConferenceProgramPdf } from "../api/conferenceApi.ts";
 
 import {
     ProgramLegend,

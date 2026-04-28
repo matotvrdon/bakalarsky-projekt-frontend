@@ -15,6 +15,8 @@ type ConferenceEntrySelectorProps = {
 export function ConferenceEntrySelector({
                                             dashboard,
                                         }: ConferenceEntrySelectorProps) {
+    const locked = dashboard.invoiceGenerated;
+
     if (dashboard.conferenceEntryOptions.length === 0) {
         return (
             <PublicAlert icon={AlertCircle}>
@@ -37,6 +39,7 @@ export function ConferenceEntrySelector({
                         key={conferenceEntry.id}
                         htmlFor={id}
                         selected={selected}
+                        disabled={locked}
                     >
                         <input
                             id={id}
@@ -44,6 +47,7 @@ export function ConferenceEntrySelector({
                             name="conferenceEntry"
                             value={conferenceEntry.id}
                             checked={selected}
+                            disabled={locked}
                             onChange={(event) =>
                                 dashboard.setSelectedConferenceEntryId(
                                     event.target.value

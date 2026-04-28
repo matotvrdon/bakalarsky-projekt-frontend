@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import {
     getActiveConference,
     type Conference,
-} from "../../../app/api/conferenceApi.ts";
+} from "../../../api/conferenceApi.ts";
 
 type ActiveConferenceResponse = Conference | Conference[] | null;
 

@@ -2,7 +2,7 @@ import type {
     Committee,
     CommitteeMember,
     CommitteeRole,
-} from "../../../app/api/committeeApi.ts";
+} from "../../../api/committeeApi.ts";
 
 import type {
     BookingOption,
@@ -15,7 +15,7 @@ import type {
     ProgramItemType,
     ProgramPresentation,
     ProgramSession,
-} from "../../../app/api/conferenceApi.ts";
+} from "../../../api/conferenceApi.ts";
 
 import type {
     BookingOptionCreateForm,

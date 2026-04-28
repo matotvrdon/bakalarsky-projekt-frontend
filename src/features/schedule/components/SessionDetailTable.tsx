@@ -1,6 +1,6 @@
 import { Users } from "lucide-react";
 
-import type { ProgramSession } from "../../../app/api/conferenceApi.ts";
+import type { ProgramSession } from "../../../api/conferenceApi.ts";
 
 import {
     formatTimeRange,

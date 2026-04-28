@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import {
     getActiveCommittees,
     type ConferenceCommittees,
-} from "../../../app/api/committeeApi.ts";
+} from "../../../api/committeeApi.ts";
 
 type UseCommitteesState = {
     data: ConferenceCommittees | null;

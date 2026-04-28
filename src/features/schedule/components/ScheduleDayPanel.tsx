@@ -1,4 +1,4 @@
-import type { ProgramDay } from "../../../app/api/conferenceApi.ts";
+import type { ProgramDay } from "../../../api/conferenceApi.ts";
 
 import { sortProgramItems } from "../utils/scheduleUtils.ts";
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { getActiveSubmissionSettings } from "../../../app/api/submissionSettingsApi.ts";
+import { getActiveSubmissionSettings } from "../../../api/submissionSettingsApi.ts";
 import type { SubmissionSettings } from "../types/submissionSettingsTypes.ts";
 
 type UseSubmissionSettingsState = {

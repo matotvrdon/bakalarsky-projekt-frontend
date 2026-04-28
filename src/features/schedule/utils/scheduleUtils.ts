@@ -4,7 +4,7 @@ import type {
     ProgramItemType,
     ProgramPresentation,
     ProgramSession,
-} from "../../../app/api/conferenceApi.ts";
+} from "../../../api/conferenceApi.ts";
 
 export const PROGRAM_ITEM_TYPE = {
     registration: 0,

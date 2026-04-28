@@ -1,6 +1,6 @@
 import { Clock, MapPin, User, Users } from "lucide-react";
 
-import type { ProgramItem } from "../../../app/api/conferenceApi.ts";
+import type { ProgramItem } from "../../../api/conferenceApi.ts";
 
 import {
     formatTimeRange,

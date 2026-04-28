@@ -10,7 +10,7 @@ import {
     PublicTabs,
     ServicesTab,
     SubmissionTab,
-} from "../features/public/components/index.ts";
+} from "../features/public/components/layout";
 
 import type { PublicTabValue } from "../features/public/types/publicTypes.ts";
 
