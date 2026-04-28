@@ -1,0 +1,6 @@
+export const STUDENT_VERIFICATION_FILE_TYPE = 0;
+export const SUBMISSION_FILE_TYPE = 1;
+
+export const WAITING_FOR_APPROVAL_STATUS = 0;
+export const APPROVED_STATUS = 1;
+export const REJECTED_STATUS = 2;
