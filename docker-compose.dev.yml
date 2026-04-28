@@ -1,5 +1,6 @@
 services:
   frontend:
+    container_name: web-frontend-dev
     image: ghcr.io/${IMAGE_REPO}:${IMAGE_TAG}
     restart: unless-stopped
     ports:

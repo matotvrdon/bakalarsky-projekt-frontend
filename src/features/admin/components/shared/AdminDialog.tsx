@@ -1,0 +1,1 @@
+export { AdminDialog } from "../base/index.ts";
