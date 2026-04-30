@@ -1,13 +1,22 @@
 import { api, BASE_URL } from "./baseApi.ts";
 
+export type ConferenceStatus = 0 | 1 | 2;
+
+export const ConferenceStatusValue = {
+  Preparation: 0,
+  Active: 1,
+  Ended: 2,
+} as const satisfies Record<string, ConferenceStatus>;
+
 export type Conference = {
   id: number;
   name: string;
   description: string;
   startDate: string;
   endDate: string;
-  location: string;
-  isActive: boolean;
+  location: string | null;
+  isPublished: boolean;
+  status: ConferenceStatus;
   participantsCount?: number;
   settings?: ConferenceSettings | null;
 };
@@ -15,6 +24,7 @@ export type Conference = {
 export type ImportantDateStatus = "Normal" | "Shortened" | "Extended";
 export type FoodOptionType = 0 | 1 | 2;
 export type ProgramItemType = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
+
 export type ConferenceEntry = {
   id: number;
   name: string;
@@ -141,16 +151,11 @@ export type ConferenceCreatePayload = {
   startDate: string;
   endDate: string;
   location: string;
+  isPublished: boolean;
+  status: ConferenceStatus;
 };
 
-export type ConferenceUpdatePayload = {
-  name: string;
-  description: string;
-  startDate: string;
-  endDate: string;
-  location: string;
-  isActive?: boolean;
-};
+export type ConferenceUpdatePayload = ConferenceCreatePayload;
 
 export type ImportantDateCreatePayload = {
   label: string;
@@ -216,13 +221,19 @@ export const getActiveConference = async () => {
 };
 
 export const getAllConferences = () =>
-  api<Conference[]>("/api/conference");
+    api<Conference[]>("/api/conference");
 
 export const getActiveConferences = () =>
-  api<Conference[]>("/api/conference/active");
+    api<Conference[]>("/api/conference/active");
 
 export const getConferenceById = (id: number) =>
-  api<Conference>(`/api/conference/${id}`);
+    api<Conference>(`/api/conference/${id}`);
+
+export const getPublicConferenceById = (id: number) =>
+    api<Conference>(`/api/conference/public/${id}`);
+
+export const getConferencePreviewById = (id: number) =>
+    api<Conference>(`/api/conference/${id}/preview`);
 
 export const downloadConferenceProgramPdf = async (id: number) => {
   const response = await fetch(`${BASE_URL}/api/conference/${id}/program/pdf`, {
@@ -233,6 +244,7 @@ export const downloadConferenceProgramPdf = async (id: number) => {
 
   if (!response.ok) {
     let message = "Program PDF sa nepodarilo stiahnuť.";
+
     try {
       const text = await response.text();
       message = text || message;
@@ -244,7 +256,7 @@ export const downloadConferenceProgramPdf = async (id: number) => {
   }
 
   const contentDisposition = response.headers.get("Content-Disposition");
-  const matchedFileName = contentDisposition?.match(/filename\*?=(?:UTF-8''|\"?)([^\";]+)/i)?.[1];
+  const matchedFileName = contentDisposition?.match(/filename\*?=(?:UTF-8''|"?)([^";]+)/i)?.[1];
   const fileName = decodeURIComponent(matchedFileName ?? "program-konferencie.pdf").replaceAll("\"", "");
   const blob = await response.blob();
 
@@ -252,132 +264,132 @@ export const downloadConferenceProgramPdf = async (id: number) => {
 };
 
 export const createConference = (data: ConferenceCreatePayload) =>
-  api<Conference>("/api/conference", {
-    method: "POST",
-    json: data
-  });
+    api<Conference>("/api/conference", {
+      method: "POST",
+      json: data,
+    });
 
 export const updateConference = (id: number, data: ConferenceUpdatePayload) =>
-  api<Conference>(`/api/conference/${id}`, {
-    method: "PUT",
-    json: data
-  });
+    api<Conference>(`/api/conference/${id}`, {
+      method: "PUT",
+      json: data,
+    });
 
 export const createConferenceSettings = (id: number, data: ConferenceSettingsPayload) =>
-  api(`/api/conference/${id}/conference-settings`, {
-    method: "POST",
-    json: data
-  });
+    api(`/api/conference/${id}/conference-settings`, {
+      method: "POST",
+      json: data,
+    });
 
 export const updateConferenceImportantDate = (
-  conferenceId: number,
-  importantDateId: number,
-  data: ImportantDateUpdatePayload
+    conferenceId: number,
+    importantDateId: number,
+    data: ImportantDateUpdatePayload
 ) =>
-  api<ImportantDate>(`/api/conference/${conferenceId}/conference-settings/${importantDateId}`, {
-    method: "PUT",
-    json: data
-  });
+    api<ImportantDate>(`/api/conference/${conferenceId}/conference-settings/${importantDateId}`, {
+      method: "PUT",
+      json: data,
+    });
 
 export const deleteConferenceImportantDate = (
-  conferenceId: number,
-  importantDateId: number
+    conferenceId: number,
+    importantDateId: number
 ) =>
-  api<void>(`/api/conference/${conferenceId}/conference-settings/${importantDateId}`, {
-    method: "DELETE"
-  });
+    api<void>(`/api/conference/${conferenceId}/conference-settings/${importantDateId}`, {
+      method: "DELETE",
+    });
 
 export const createConferenceEntries = (
-  conferenceId: number,
-  data: ConferenceEntriesSettingsPayload
+    conferenceId: number,
+    data: ConferenceEntriesSettingsPayload
 ) =>
-  api(`/api/conference/${conferenceId}/conference-settings/conference-entries`, {
-    method: "POST",
-    json: data
-  });
+    api(`/api/conference/${conferenceId}/conference-settings/conference-entries`, {
+      method: "POST",
+      json: data,
+    });
 
 export const updateConferenceEntry = (
-  conferenceId: number,
-  conferenceEntryId: number,
-  data: ConferenceEntryUpdatePayload
+    conferenceId: number,
+    conferenceEntryId: number,
+    data: ConferenceEntryUpdatePayload
 ) =>
-  api<ConferenceEntry>(`/api/conference/${conferenceId}/conference-settings/conference-entries/${conferenceEntryId}`, {
-    method: "PUT",
-    json: data
-  });
+    api<ConferenceEntry>(`/api/conference/${conferenceId}/conference-settings/conference-entries/${conferenceEntryId}`, {
+      method: "PUT",
+      json: data,
+    });
 
 export const deleteConferenceEntry = (
-  conferenceId: number,
-  conferenceEntryId: number
+    conferenceId: number,
+    conferenceEntryId: number
 ) =>
-  api<void>(`/api/conference/${conferenceId}/conference-settings/conference-entries/${conferenceEntryId}`, {
-    method: "DELETE"
-  });
+    api<void>(`/api/conference/${conferenceId}/conference-settings/conference-entries/${conferenceEntryId}`, {
+      method: "DELETE",
+    });
 
 export const createConferenceFoodOptions = (
-  conferenceId: number,
-  data: FoodOptionsSettingsPayload
+    conferenceId: number,
+    data: FoodOptionsSettingsPayload
 ) =>
-  api(`/api/conference/${conferenceId}/conference-settings/food-options`, {
-    method: "POST",
-    json: data
-  });
+    api(`/api/conference/${conferenceId}/conference-settings/food-options`, {
+      method: "POST",
+      json: data,
+    });
 
 export const updateConferenceFoodOption = (
-  conferenceId: number,
-  foodOptionId: number,
-  data: FoodOptionUpdatePayload
+    conferenceId: number,
+    foodOptionId: number,
+    data: FoodOptionUpdatePayload
 ) =>
-  api<FoodOption>(`/api/conference/${conferenceId}/conference-settings/food-options/${foodOptionId}`, {
-    method: "PUT",
-    json: data
-  });
+    api<FoodOption>(`/api/conference/${conferenceId}/conference-settings/food-options/${foodOptionId}`, {
+      method: "PUT",
+      json: data,
+    });
 
 export const deleteConferenceFoodOption = (
-  conferenceId: number,
-  foodOptionId: number
+    conferenceId: number,
+    foodOptionId: number
 ) =>
-  api<void>(`/api/conference/${conferenceId}/conference-settings/food-options/${foodOptionId}`, {
-    method: "DELETE"
-  });
+    api<void>(`/api/conference/${conferenceId}/conference-settings/food-options/${foodOptionId}`, {
+      method: "DELETE",
+    });
 
 export const createConferenceBookingOptions = (
-  conferenceId: number,
-  data: BookingOptionsSettingsPayload
+    conferenceId: number,
+    data: BookingOptionsSettingsPayload
 ) =>
-  api(`/api/conference/${conferenceId}/conference-settings/booking-options`, {
-    method: "POST",
-    json: data
-  });
+    api(`/api/conference/${conferenceId}/conference-settings/booking-options`, {
+      method: "POST",
+      json: data,
+    });
 
 export const updateConferenceBookingOption = (
-  conferenceId: number,
-  bookingOptionId: number,
-  data: BookingOptionUpdatePayload
+    conferenceId: number,
+    bookingOptionId: number,
+    data: BookingOptionUpdatePayload
 ) =>
-  api<BookingOption>(`/api/conference/${conferenceId}/conference-settings/booking-options/${bookingOptionId}`, {
-    method: "PUT",
-    json: data
-  });
+    api<BookingOption>(`/api/conference/${conferenceId}/conference-settings/booking-options/${bookingOptionId}`, {
+      method: "PUT",
+      json: data,
+    });
 
 export const deleteConferenceBookingOption = (
-  conferenceId: number,
-  bookingOptionId: number
+    conferenceId: number,
+    bookingOptionId: number
 ) =>
-  api<void>(`/api/conference/${conferenceId}/conference-settings/booking-options/${bookingOptionId}`, {
-    method: "DELETE"
-  });
+    api<void>(`/api/conference/${conferenceId}/conference-settings/booking-options/${bookingOptionId}`, {
+      method: "DELETE",
+    });
 
 export const replaceConferenceProgram = (
-  conferenceId: number,
-  data: ProgramReplacePayload
+    conferenceId: number,
+    data: ProgramReplacePayload
 ) =>
-  api<ConferenceSettings>(`/api/conference/${conferenceId}/conference-settings/program`, {
-    method: "PUT",
-    json: data
-  });
+    api<ConferenceSettings>(`/api/conference/${conferenceId}/conference-settings/program`, {
+      method: "PUT",
+      json: data,
+    });
 
 export const deleteConference = (id: number) =>
-  api<void>(`/api/conference/${id}`, {
-    method: "DELETE"
-  });
+    api<void>(`/api/conference/${id}`, {
+      method: "DELETE",
+    });

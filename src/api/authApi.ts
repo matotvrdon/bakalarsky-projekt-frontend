@@ -85,7 +85,11 @@ const isValidationErrorResponse = (value: unknown): value is ValidationErrorResp
 };
 
 const isBusinessErrorResponse = (value: unknown): value is BusinessErrorResponse => {
-  return Boolean(value && typeof value === "object" && ("message" in value || "code" in value || "field" in value));
+  return Boolean(
+      value &&
+      typeof value === "object" &&
+      ("message" in value || "code" in value || "field" in value)
+  );
 };
 
 const postAuth = async <T>(path: string, payload: unknown): Promise<T> => {
@@ -111,20 +115,20 @@ const postAuth = async <T>(path: string, payload: unknown): Promise<T> => {
 
     if (isValidationErrorResponse(parsedBody) && parsedBody.errors) {
       throw new AuthApiError(
-        parsedBody.title || "Validation failed",
-        response.status,
-        { validationErrors: parsedBody.errors }
+          parsedBody.title || "Validation failed",
+          response.status,
+          { validationErrors: parsedBody.errors }
       );
     }
 
     if (isBusinessErrorResponse(parsedBody)) {
       throw new AuthApiError(
-        parsedBody.message || "Request failed",
-        response.status,
-        {
-          code: parsedBody.code,
-          field: parsedBody.field ?? null,
-        }
+          parsedBody.message || "Request failed",
+          response.status,
+          {
+            code: parsedBody.code,
+            field: parsedBody.field ?? null,
+          }
       );
     }
 
@@ -139,10 +143,13 @@ const postAuth = async <T>(path: string, payload: unknown): Promise<T> => {
 };
 
 export const registerBasic = (data: RegisterBasicPayload) =>
-  postAuth<RegisterBasicResponse>("/api/auth/register-basic", data);
+    postAuth<RegisterBasicResponse>("/api/auth/register-basic", data);
 
 export const registerAccount = (data: RegisterAccountPayload) =>
-  postAuth<RegisterAccountResponse>("/api/auth/register-account", data);
+    postAuth<RegisterAccountResponse>("/api/auth/register-account", data);
 
 export const login = (data: LoginRequest) =>
-  postAuth<LoginResponse>("/api/auth/login", data);
+    postAuth<LoginResponse>("/api/auth/login", data);
+
+export const adminLogin = (data: LoginRequest) =>
+    postAuth<LoginResponse>("/api/auth/admin-login", data);

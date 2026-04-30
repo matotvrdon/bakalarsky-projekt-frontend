@@ -2,10 +2,12 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import {
+    ConferenceStatusValue,
     createConference,
     deleteConference,
     getAllConferences,
     updateConference,
+    type ConferenceStatus,
 } from "../../../api/conferenceApi.ts";
 
 import type { Conference } from "../types/adminTypes.ts";
@@ -16,11 +18,11 @@ type CreateConferenceInput = {
     startDate: string;
     endDate: string;
     location: string;
+    isPublished: boolean;
+    status: ConferenceStatus;
 };
 
-type UpdateConferenceInput = CreateConferenceInput & {
-    isActive: boolean;
-};
+type UpdateConferenceInput = CreateConferenceInput;
 
 export function useConferences() {
     const [conferences, setConferences] = useState<Conference[]>([]);
@@ -33,9 +35,12 @@ export function useConferences() {
         try {
             const data = await getAllConferences();
 
-            const normalized = Array.isArray(data)
+            const normalized: Conference[] = Array.isArray(data)
                 ? data.map((conference) => ({
                     ...conference,
+                    location: conference.location ?? "",
+                    isPublished: conference.isPublished ?? false,
+                    status: conference.status ?? ConferenceStatusValue.Preparation,
                     participantsCount: conference.participantsCount ?? 0,
                 }))
                 : [];

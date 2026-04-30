@@ -1,4 +1,5 @@
 export { AccountModeSelector } from "./AccountModeSelector.tsx";
+export { AdminLoginCard } from "./AdminLoginCard.tsx";
 export { AuthFormField } from "./AuthFormField.tsx";
 export { AuthPageShell } from "./AuthPageShell.tsx";
 export { LoginCard } from "./LoginCard.tsx";

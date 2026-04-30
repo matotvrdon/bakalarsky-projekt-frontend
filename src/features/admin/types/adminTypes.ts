@@ -7,13 +7,14 @@ import type {
 import type {
     ConferenceEntry,
     ConferenceSettings,
+    ConferenceStatus,
     FoodOptionType,
     ProgramItemType,
 } from "../../../api/conferenceApi.ts";
 
 import type { FileManagerPayload } from "../../../api/participantApi.ts";
 
-export type { FoodOptionType, ProgramItemType };
+export type { ConferenceStatus, FoodOptionType, ProgramItemType };
 
 export type Conference = {
     id: number;
@@ -22,7 +23,8 @@ export type Conference = {
     startDate: string;
     endDate: string;
     location: string;
-    isActive: boolean;
+    isPublished: boolean;
+    status: ConferenceStatus;
     participantsCount: number;
     settings?: ConferenceSettings | null;
 };

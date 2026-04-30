@@ -1,6 +1,7 @@
 import {
     Clock,
     ClipboardList,
+    Eye,
     FileText,
     FolderTree,
     Hotel,
@@ -17,10 +18,13 @@ import {
     AdminEntityCard,
 } from "../shared/index.ts";
 
+import { ConferenceStatusValue } from "../../../../api/conferenceApi.ts";
+
 type ConferenceCardProps = {
     conference: Conference;
     onEdit: () => void;
     onDelete: () => void;
+    onPreview: () => void;
     onOpenEntries: () => void;
     onOpenImportantDates: () => void;
     onOpenFood: () => void;
@@ -30,10 +34,23 @@ type ConferenceCardProps = {
     onOpenSubmissionSettings: () => void;
 };
 
+const getConferenceStatusLabel = (status: Conference["status"]) => {
+    switch (status) {
+        case ConferenceStatusValue.Active:
+            return "Aktívna";
+        case ConferenceStatusValue.Ended:
+            return "Ukončená";
+        case ConferenceStatusValue.Preparation:
+        default:
+            return "Príprava";
+    }
+};
+
 export function ConferenceCard({
                                    conference,
                                    onEdit,
                                    onDelete,
+                                   onPreview,
                                    onOpenEntries,
                                    onOpenImportantDates,
                                    onOpenFood,
@@ -45,15 +62,38 @@ export function ConferenceCard({
     const dateText = `${conference.startDate} - ${conference.endDate}`;
     const locationText = conference.location ? ` • ${conference.location}` : "";
 
+    const isVisibleForUsers =
+        conference.isPublished &&
+        conference.status === ConferenceStatusValue.Active;
+
     return (
         <AdminEntityCard
             title={conference.name}
             subtitle={`${dateText}${locationText}`}
             meta={`${conference.participantsCount} účastníkov`}
-            active={conference.isActive}
-            badges={conference.isActive ? <AdminBadge>Aktívna</AdminBadge> : null}
+            active={isVisibleForUsers}
+            badges={
+                <div className="flex flex-wrap gap-2">
+                    <AdminBadge>{getConferenceStatusLabel(conference.status)}</AdminBadge>
+
+                    {conference.isPublished ? (
+                        <AdminBadge>Zverejnená</AdminBadge>
+                    ) : (
+                        <AdminBadge>Skrytá</AdminBadge>
+                    )}
+                </div>
+            }
             actions={
                 <>
+                    <AdminActionButton
+                        label="Náhľad"
+                        icon={Eye}
+                        onClick={onPreview}
+                        hiddenLabelOnMobile={false}
+                        size="md"
+                        className="min-w-[130px]"
+                    />
+
                     <AdminActionButton
                         label="Entry"
                         icon={Users}

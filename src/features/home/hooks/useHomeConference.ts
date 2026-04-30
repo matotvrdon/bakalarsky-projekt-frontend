@@ -6,6 +6,7 @@ export function useHomeConference() {
         activeConference,
         loading,
         error,
+        isPreview,
     } = useActiveConference();
 
     const conferenceName =
@@ -26,12 +27,11 @@ export function useHomeConference() {
     const importantDates =
         activeConference?.settings?.importantDates ?? [];
 
-    console.log("HOME IMPORTANT DATES:", importantDates);
-
     return {
         activeConference,
         loading,
         error,
+        isPreview,
         conferenceName,
         conferenceDescription,
         conferenceLocation,

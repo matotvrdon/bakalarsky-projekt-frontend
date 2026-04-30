@@ -3,22 +3,22 @@ import type { RootNavigationItem } from "../types/rootTypes.ts";
 export const rootNavigationItems: RootNavigationItem[] = [
     {
         name: "Domov",
-        href: "/",
+        href: "",
     },
     {
         name: "Komisie",
-        href: "/committees",
+        href: "committees",
     },
     {
         name: "Program",
-        href: "/schedule",
+        href: "schedule",
     },
     {
         name: "Príspevky",
-        href: "/submissions",
+        href: "submissions",
     },
     {
         name: "Registrácia",
-        href: "/register",
+        href: "register",
     },
 ];

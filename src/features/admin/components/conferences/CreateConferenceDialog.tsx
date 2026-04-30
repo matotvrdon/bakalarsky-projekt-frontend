@@ -3,6 +3,7 @@ import { toast } from "sonner";
 
 import {
     AdminButton,
+    AdminCheckbox,
     AdminInput,
     AdminTextarea,
 } from "../base/index.ts";
@@ -13,6 +14,11 @@ import {
     AdminFormGrid,
 } from "../shared/index.ts";
 
+import {
+    ConferenceStatusValue,
+    type ConferenceStatus,
+} from "../../../../api/conferenceApi.ts";
+
 type CreateConferenceDialogProps = {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -22,8 +28,16 @@ type CreateConferenceDialogProps = {
         startDate: string;
         endDate: string;
         location: string;
+        isPublished: boolean;
+        status: ConferenceStatus;
     }) => Promise<void>;
 };
+
+const conferenceStatusOptions: { value: ConferenceStatus; label: string }[] = [
+    { value: ConferenceStatusValue.Preparation, label: "Príprava" },
+    { value: ConferenceStatusValue.Active, label: "Aktívna" },
+    { value: ConferenceStatusValue.Ended, label: "Ukončená" },
+];
 
 const emptyForm = {
     name: "",
@@ -31,6 +45,22 @@ const emptyForm = {
     startDate: "",
     endDate: "",
     location: "",
+    isPublished: false,
+    status: ConferenceStatusValue.Preparation as ConferenceStatus,
+};
+
+const normalizeConferenceStatus = (value: string): ConferenceStatus => {
+    const numericValue = Number(value);
+
+    if (
+        numericValue === ConferenceStatusValue.Preparation ||
+        numericValue === ConferenceStatusValue.Active ||
+        numericValue === ConferenceStatusValue.Ended
+    ) {
+        return numericValue;
+    }
+
+    return ConferenceStatusValue.Preparation;
 };
 
 export function CreateConferenceDialog({
@@ -57,6 +87,8 @@ export function CreateConferenceDialog({
             startDate: form.startDate,
             endDate: form.endDate,
             location: form.location.trim(),
+            isPublished: form.isPublished,
+            status: form.status,
         });
 
         setForm(emptyForm);
@@ -168,8 +200,49 @@ export function CreateConferenceDialog({
                         />
                     </AdminFormField>
 
+                    <AdminFormGrid columns={2}>
+                        <AdminFormField
+                            label="Stav konferencie"
+                            htmlFor="conference-status"
+                            required
+                        >
+                            <select
+                                id="conference-status"
+                                value={String(form.status)}
+                                onChange={(event) =>
+                                    setForm({
+                                        ...form,
+                                        status: normalizeConferenceStatus(event.target.value),
+                                    })
+                                }
+                                className="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                            >
+                                {conferenceStatusOptions.map((option) => (
+                                    <option key={option.value} value={option.value}>
+                                        {option.label}
+                                    </option>
+                                ))}
+                            </select>
+                        </AdminFormField>
+
+                        <label
+                            htmlFor="conference-published"
+                            className="flex cursor-pointer items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-800"
+                        >
+                            <AdminCheckbox
+                                id="conference-published"
+                                checked={form.isPublished}
+                                onChange={(event) =>
+                                    setForm({ ...form, isPublished: event.target.checked })
+                                }
+                            />
+
+                            Zverejniť používateľom
+                        </label>
+                    </AdminFormGrid>
+
                     <p className="rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-3 text-sm text-gray-600">
-                        Dôležité termíny, entry, stravu, ubytovanie a program nastavíš po vytvorení konferencie.
+                        Publikovanie určuje, či sa konferencia zobrazí používateľom. Stav určuje, či je v príprave, aktívna alebo ukončená.
                     </p>
                 </div>
             </div>

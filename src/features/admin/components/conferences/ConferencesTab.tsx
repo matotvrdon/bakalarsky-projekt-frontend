@@ -1,7 +1,11 @@
 import { useState } from "react";
+import { useNavigate } from "react-router";
 import { Plus } from "lucide-react";
 
-import type { Conference } from "../../types/adminTypes.ts";
+import type {
+    Conference,
+    ConferenceStatus,
+} from "../../types/adminTypes.ts";
 
 import {
     AdminActionButton,
@@ -30,6 +34,8 @@ type ConferencesTabProps = {
         startDate: string;
         endDate: string;
         location: string;
+        isPublished: boolean;
+        status: ConferenceStatus;
     }) => Promise<void>;
     onUpdateConference: (
         id: number,
@@ -39,7 +45,8 @@ type ConferencesTabProps = {
             startDate: string;
             endDate: string;
             location: string;
-            isActive: boolean;
+            isPublished: boolean;
+            status: ConferenceStatus;
         }
     ) => Promise<void>;
     onDeleteConference: (id: number) => Promise<void>;
@@ -54,6 +61,8 @@ export function ConferencesTab({
                                    onDeleteConference,
                                    onOpenCommittees,
                                }: ConferencesTabProps) {
+    const navigate = useNavigate();
+
     const [createOpen, setCreateOpen] = useState(false);
     const [editConference, setEditConference] = useState<Conference | null>(null);
     const [deleteConferenceId, setDeleteConferenceId] = useState<number | null>(null);
@@ -75,6 +84,10 @@ export function ConferencesTab({
 
     const [submissionSettingsConference, setSubmissionSettingsConference] =
         useState<Conference | null>(null);
+
+    const openPreview = (conferenceId: number) => {
+        navigate(`/admin/conferences/${conferenceId}/preview`);
+    };
 
     return (
         <>
@@ -114,6 +127,7 @@ export function ConferencesTab({
                                 conference={conference}
                                 onEdit={() => setEditConference(conference)}
                                 onDelete={() => setDeleteConferenceId(conference.id)}
+                                onPreview={() => openPreview(conference.id)}
                                 onOpenEntries={() => setEntriesConference(conference)}
                                 onOpenImportantDates={() =>
                                     setImportantDatesConference(conference)

@@ -13,6 +13,11 @@ import {
     AdminFormGrid,
 } from "../shared/index.ts";
 
+import {
+    ConferenceStatusValue,
+    type ConferenceStatus,
+} from "../../../../api/conferenceApi.ts";
+
 import type { Conference } from "../../types/adminTypes.ts";
 
 type EditConferenceDialogProps = {
@@ -27,9 +32,30 @@ type EditConferenceDialogProps = {
             startDate: string;
             endDate: string;
             location: string;
-            isActive: boolean;
+            isPublished: boolean;
+            status: ConferenceStatus;
         }
     ) => Promise<void>;
+};
+
+const conferenceStatusOptions: { value: ConferenceStatus; label: string }[] = [
+    { value: ConferenceStatusValue.Preparation, label: "Príprava" },
+    { value: ConferenceStatusValue.Active, label: "Aktívna" },
+    { value: ConferenceStatusValue.Ended, label: "Ukončená" },
+];
+
+const normalizeConferenceStatus = (value: string): ConferenceStatus => {
+    const numericValue = Number(value);
+
+    if (
+        numericValue === ConferenceStatusValue.Preparation ||
+        numericValue === ConferenceStatusValue.Active ||
+        numericValue === ConferenceStatusValue.Ended
+    ) {
+        return numericValue;
+    }
+
+    return ConferenceStatusValue.Preparation;
 };
 
 export function EditConferenceDialog({
@@ -55,7 +81,8 @@ export function EditConferenceDialog({
             startDate: form.startDate,
             endDate: form.endDate,
             location: form.location,
-            isActive: form.isActive,
+            isPublished: form.isPublished,
+            status: form.status,
         });
 
         onOpenChange(false);
@@ -157,20 +184,46 @@ export function EditConferenceDialog({
                             />
                         </AdminFormField>
 
-                        <label
-                            htmlFor="edit-conference-active"
-                            className="flex cursor-pointer items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-800"
-                        >
-                            <AdminCheckbox
-                                id="edit-conference-active"
-                                checked={!!form.isActive}
-                                onChange={(event) =>
-                                    setForm({ ...form, isActive: event.target.checked })
-                                }
-                            />
+                        <AdminFormGrid columns={2}>
+                            <AdminFormField
+                                label="Stav konferencie"
+                                htmlFor="edit-conference-status"
+                                required
+                            >
+                                <select
+                                    id="edit-conference-status"
+                                    value={String(form.status)}
+                                    onChange={(event) =>
+                                        setForm({
+                                            ...form,
+                                            status: normalizeConferenceStatus(event.target.value),
+                                        })
+                                    }
+                                    className="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                                >
+                                    {conferenceStatusOptions.map((option) => (
+                                        <option key={option.value} value={option.value}>
+                                            {option.label}
+                                        </option>
+                                    ))}
+                                </select>
+                            </AdminFormField>
 
-                            Aktívna konferencia
-                        </label>
+                            <label
+                                htmlFor="edit-conference-published"
+                                className="flex cursor-pointer items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-800"
+                            >
+                                <AdminCheckbox
+                                    id="edit-conference-published"
+                                    checked={!!form.isPublished}
+                                    onChange={(event) =>
+                                        setForm({ ...form, isPublished: event.target.checked })
+                                    }
+                                />
+
+                                Zverejnená používateľom
+                            </label>
+                        </AdminFormGrid>
                     </div>
                 </div>
             )}

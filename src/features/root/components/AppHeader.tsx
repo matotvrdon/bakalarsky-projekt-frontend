@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
-import { Link, useLocation } from "react-router";
-import { Menu, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useLocation, useParams } from "react-router";
+import { LogOut, Menu, X } from "lucide-react";
 
 import { useRootActiveConference } from "../hooks/useRootActiveConference.ts";
 import { rootNavigationItems } from "../constants/rootNavigation.ts";
@@ -21,7 +21,30 @@ const getVisibleNavigation = (
         return rootNavigationItems;
     }
 
-    return rootNavigationItems.filter((item) => item.href !== "/register");
+    return rootNavigationItems.filter((item) => item.href !== "register");
+};
+
+const createConferencePath = (
+    basePath: string,
+    itemPath: string
+) => {
+    if (!itemPath) {
+        return basePath;
+    }
+
+    return `${basePath}/${itemPath}`;
+};
+
+const shouldHideHeader = (pathname: string) => {
+    return pathname === "/selection" || pathname === "/";
+};
+
+const isAdminUser = (currentUser: RootUser | null) => {
+    if (!currentUser) {
+        return false;
+    }
+
+    return currentUser.role === "admin";
 };
 
 export function AppHeader({
@@ -29,15 +52,42 @@ export function AppHeader({
                               onLogout,
                           }: AppHeaderProps) {
     const location = useLocation();
+    const params = useParams();
+
     const activeConference = useRootActiveConference();
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-    const visibleNavigation = getVisibleNavigation(currentUser);
-    const conferenceName = activeConference?.name || "Conference.Name";
+    const conferenceId = params.conferenceId;
+    const isPreview = location.pathname.startsWith("/admin/conferences/");
+    const hideHeader = shouldHideHeader(location.pathname);
+    const isAdmin = isAdminUser(currentUser);
+
+    const baseConferencePath = useMemo(() => {
+        if (conferenceId && isPreview) {
+            return `/admin/conferences/${conferenceId}/preview`;
+        }
+
+        if (conferenceId) {
+            return `/conference/${conferenceId}`;
+        }
+
+        return "/selection";
+    }, [conferenceId, isPreview]);
+
+    const visibleNavigation = getVisibleNavigation(currentUser).map((item) => ({
+        ...item,
+        href: createConferencePath(baseConferencePath, item.href),
+    }));
+
+    const conferenceName = activeConference?.name || "Konferencia";
+
+    const logoHref = conferenceId
+        ? baseConferencePath
+        : "/selection";
 
     const isActive = (href: string) => {
-        if (href === "/") {
-            return location.pathname === "/";
+        if (href === baseConferencePath) {
+            return location.pathname === baseConferencePath;
         }
 
         return location.pathname.startsWith(href);
@@ -47,12 +97,39 @@ export function AppHeader({
         setMobileMenuOpen(false);
     }, [location.pathname]);
 
+    if (hideHeader) {
+        return null;
+    }
+
+    if (isAdmin && !isPreview) {
+        return (
+            <header className="sticky top-0 z-50 border-b bg-white">
+                <div className="container mx-auto px-4">
+                    <div className="flex h-16 items-center justify-between">
+                        <Link to="/selection" className="text-xl font-bold">
+                            Konferencia
+                        </Link>
+
+                        <button
+                            type="button"
+                            onClick={onLogout}
+                            className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-100"
+                        >
+                            <LogOut className="h-4 w-4" />
+                            Odhlásiť
+                        </button>
+                    </div>
+                </div>
+            </header>
+        );
+    }
+
     return (
         <header className="sticky top-0 z-50 border-b bg-white">
             <div className="container mx-auto px-4">
                 <div className="flex h-16 items-center justify-between">
-                    <Link to="/" className="text-xl font-bold">
-                        {conferenceName}
+                    <Link to={logoHref} className="text-xl font-bold">
+                        {isPreview ? conferenceName : conferenceName}
                     </Link>
 
                     <DesktopNavigation
